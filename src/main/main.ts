@@ -11,6 +11,8 @@ import { LocalOnlyAdapter } from './cloud/sync';
 import { KeyManager } from './security/key-manager';
 import { ProfileAutomationController } from './automation/controller';
 import { AutomationAPIGateway } from './api/automation';
+import { ControlNodeOrchestrator } from './distributed/control';
+import { WorkerNodeRuntime } from './distributed/worker';
 import * as crypto from 'crypto';
 
 // Determine Paths
@@ -34,8 +36,9 @@ const automationGateway = new AutomationAPIGateway(automationController, 5543);
 
 let mainWindow: BrowserWindow | null;
 
-// Offline Mode Enforcement Flag
-const IS_OFFLINE_MODE = true;
+// Node Execution Modes: 'local', 'control', or 'worker'
+// In production, parse this securely from process.argv
+const NODE_MODE = process.env.NODE_MODE || 'local';
 
 async function initCoreSystems() {
     // 1. Initialize Encryption
@@ -45,31 +48,49 @@ async function initCoreSystems() {
     // 2. Initialize Database
     await storage.initialize();
 
-    if (IS_OFFLINE_MODE) {
+    if (NODE_MODE === 'local') {
         console.log('[Boot Sequence] Local Enterprise Deployment Mode initialized. All cloud integrations are strictly disabled.');
     }
 
     // 3. Clean up orphaned resources to ensure efficient local disk usage
     await resourceManager.cleanupOrphanedResources();
 
-    // 4. Start Local Automation API
+    // 4. Start Local Automation API (exposes HTTP server used by Control Node)
     automationGateway.start();
 
+    if (NODE_MODE === 'control') {
+        console.log('[Boot Sequence] Initializing as Distributed Control Node.');
+        const server = (automationGateway as any).server; // piggyback off express server
+        const orchestrator = new ControlNodeOrchestrator(server, masterKey, profileManager);
+    }
+    else if (NODE_MODE === 'worker') {
+        console.log('[Boot Sequence] Initializing as Distributed Worker Node.');
+        const controlUrl = process.env.CONTROL_NODE_URL || 'ws://127.0.0.1:5543/cluster/v1/ws';
+        const worker = new WorkerNodeRuntime(controlUrl, masterKey, resourceManager, automationController, profileManager);
+        worker.start();
+    }
+    else {
+        // Local mode logic
+        console.log('[Boot Sequence] Initializing as Local Enterprise Node.');
+    }
+
     // 5. Hydrate Device Profile Registry
-    const profiles = await storage.getAllProfiles();
-    for (const pMeta of profiles) {
-        const fullProfile = await storage.getProfile(pMeta.id);
-        if (fullProfile && fullProfile.fingerprint) {
-            // Re-hydrate the memory registry so unique seeds are persisted across restarts
-            deviceRegistry.register({
-                profileId: fullProfile.id,
-                templateId: 'unknown', // Storing the exact template isn't critical for uniqueness validation
-                seed: String(fullProfile.fingerprint.canvasNoiseSeed), // Use canvas seed as unique deterministic identifier
-                os: fullProfile.fingerprint.hardware?.os || '',
-                browser: fullProfile.fingerprint.hardware?.browser || '',
-                gpu: fullProfile.fingerprint.webgl?.unmaskedRenderer || '',
-                resolution: fullProfile.fingerprint.screen ? `${fullProfile.fingerprint.screen.width}x${fullProfile.fingerprint.screen.height}` : ''
-            });
+    if (NODE_MODE !== 'worker') {
+        const profiles = await storage.getAllProfiles();
+        for (const pMeta of profiles) {
+            const fullProfile = await storage.getProfile(pMeta.id);
+            if (fullProfile && fullProfile.fingerprint) {
+                // Re-hydrate the memory registry so unique seeds are persisted across restarts
+                deviceRegistry.register({
+                    profileId: fullProfile.id,
+                    templateId: 'unknown',
+                    seed: String(fullProfile.fingerprint.canvasNoiseSeed),
+                    os: fullProfile.fingerprint.hardware?.os || '',
+                    browser: fullProfile.fingerprint.hardware?.browser || '',
+                    gpu: fullProfile.fingerprint.webgl?.unmaskedRenderer || '',
+                    resolution: fullProfile.fingerprint.screen ? `${fullProfile.fingerprint.screen.width}x${fullProfile.fingerprint.screen.height}` : ''
+                });
+            }
         }
     }
 }
