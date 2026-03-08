@@ -45,6 +45,11 @@ This platform was developed across 12 rigorous architectural phases, resulting i
 - **Hardware Consistency:** Restricts invalid configurations securely (e.g. automatically discarding non-Apple GPUs on macOS profiles or stopping Safari requests from generating on Windows).
 - **Entropy Weighting:** Profile OS and GPU assignments map dynamically to realistic market-share distributions (~60% desktop/Windows, ~20% Mac, ~20% Mobile) ensuring farm clusters look like organic crowds.
 
+### 11. Enterprise User Interface
+- **Tabbed Configuration Workflow:** A streamlined, modern interface separated into logical configuration tabs (General, Proxy, Platform, Fingerprint, Advanced).
+- **Smart Proxy Management:** Includes a **"Paste from Clipboard"** utility that seamlessly parses both standard (`host:port:username:password`) and protocol-prefixed (`socks5://host:port:username:password`) proxy formats directly into the configuration form, drastically accelerating bulk profile setup.
+- **Live Fingerprint Overview:** Real-time summary panel detailing the active device identity configuration before launch.
+
 ---
 
 ## 🛠 Technology Stack
