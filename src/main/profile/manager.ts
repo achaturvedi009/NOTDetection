@@ -4,6 +4,7 @@ import { Profile, ProxyConfig, FingerprintConfig } from './models';
 import { FingerprintGenerator } from '../fingerprint/generator';
 import { deviceRegistry } from '../fingerprint/registry';
 import { ConsistencyValidator } from '../fingerprint/validator';
+import { EnterprisePolicyEngine } from '../governance/policy';
 
 export class ProfileManager {
     private storage: StorageLayer;
@@ -17,6 +18,9 @@ export class ProfileManager {
 
         // Default proxy if none provided
         const defaultProxy: ProxyConfig = proxy || { type: 'direct' };
+
+        // Phase 12: Enforce Enterprise Policies
+        const policyEngine = new EnterprisePolicyEngine();
 
         // Default advanced fingerprint using Phase 2.5 Consistency Generator if none provided
         let defaultFingerprint: FingerprintConfig;
@@ -70,6 +74,10 @@ export class ProfileManager {
                 totalSessionTimeMs: 0
             }
         };
+
+        // Governance Validation: Will throw error and halt creation if policy is violated
+        // Dummy 'system' user used here since Profiles are created locally currently
+        policyEngine.validateProfileCreation({ id: 'system', username: 'system', passwordHash: '', role: 'system_admin', workspaceId: 'global', createdAt: new Date() }, newProfile);
 
         await this.storage.insertProfile(id, name, newProfile);
         return newProfile;

@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteProfile: (id: string) => ipcRenderer.invoke('delete-profile', id),
     launchProfile: (id: string) => ipcRenderer.invoke('launch-profile', id),
     getAnalytics: () => ipcRenderer.invoke('get-analytics'),
+    getGovernanceData: () => ipcRenderer.invoke('get-governance-data'),
 });

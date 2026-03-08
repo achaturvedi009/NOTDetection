@@ -8,6 +8,8 @@ import { FingerprintDistributionAnalyzer } from '../analytics/analyzers/distribu
 import { ProxyPerformanceAnalyzer } from '../analytics/analyzers/proxy';
 import { DetectionIntelligenceAnalyzer } from '../analytics/analyzers/detection';
 import { ProfilePerformanceAnalyzer } from '../analytics/analyzers/performance';
+import { IdentityAccessManager } from '../governance/iam';
+import { User } from '../governance/models';
 
 /**
  * Enterprise Automation API Gateway
@@ -26,6 +28,7 @@ export class AutomationAPIGateway {
     public proxyAnalyzer?: ProxyPerformanceAnalyzer;
     public detectionAnalyzer?: DetectionIntelligenceAnalyzer;
     public performanceAnalyzer?: ProfilePerformanceAnalyzer;
+    public iam?: IdentityAccessManager;
 
     constructor(controller: ProfileAutomationController, port: number = 5543) {
         this.port = port;
@@ -49,14 +52,34 @@ export class AutomationAPIGateway {
     private configureMiddleware(): void {
         this.app.use(express.json());
 
-        // Automation Security Layer: Require Bearer token for all requests
-        this.app.use((req: Request, res: Response, next: NextFunction) => {
+        // Automation Security Layer: Support IAM user tokens or master API token
+        this.app.use(async (req: Request, res: Response, next: NextFunction) => {
             const authHeader = req.headers.authorization;
-            if (!authHeader || authHeader !== `Bearer ${this.apiToken}`) {
-                res.status(401).json({ error: 'Unauthorized. Invalid or missing API token.' });
+            if (!authHeader) {
+                res.status(401).json({ error: 'Unauthorized. Missing authorization header.' });
                 return;
             }
-            next();
+
+            const token = authHeader.replace('Bearer ', '');
+
+            if (token === this.apiToken) {
+                // System level token (used by local workers)
+                (req as any).user = { id: 'system', role: 'system_admin' };
+                return next();
+            }
+
+            // Phase 12: IAM Auth (In a real system, the token would be a signed JWT)
+            // For simplicity, we assume basic auth format `username:password` here for the demo
+            if (this.iam && token.includes(':')) {
+                const [user, pass] = token.split(':');
+                const authenticatedUser = await this.iam.authenticate(user, pass);
+                if (authenticatedUser) {
+                    (req as any).user = authenticatedUser;
+                    return next();
+                }
+            }
+
+            res.status(403).json({ error: 'Forbidden. Invalid credentials.' });
         });
     }
 
@@ -87,6 +110,24 @@ export class AutomationAPIGateway {
                 const { taskName, params } = req.body;
                 const result = await this.controller.executeTask(req.params.id as string, taskName, params);
                 res.status(200).json({ status: 'success', result });
+            } catch (error: unknown) {
+                const msg = error instanceof Error ? error.message : String(error);
+                res.status(500).json({ error: msg });
+            }
+        });
+
+        // Phase 12: Governance API
+        this.app.post('/api/v1/governance/users', async (req: Request, res: Response) => {
+            try {
+                if (!this.iam || !this.iam.authorize((req as any).user, 'system_admin')) {
+                    res.status(403).json({ error: 'Forbidden. Requires system_admin role.' });
+                    return;
+                }
+                const { username, password, role, workspaceId } = req.body;
+                const hash = this.iam.hashPassword(password);
+                // The IAM db uses createUser, which accepts hash
+                await (this.iam as any).db.createUser(username, hash, role, workspaceId);
+                res.status(201).json({ status: 'success', username, role });
             } catch (error: unknown) {
                 const msg = error instanceof Error ? error.message : String(error);
                 res.status(500).json({ error: msg });

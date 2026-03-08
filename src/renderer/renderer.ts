@@ -8,6 +8,7 @@ declare global {
             deleteProfile: (id: string) => Promise<void>;
             launchProfile: (id: string) => Promise<void>;
             getAnalytics: () => Promise<any>;
+            getGovernanceData: () => Promise<any>;
         };
     }
 }
@@ -91,9 +92,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    async function loadGovernance() {
+        const govContent = document.getElementById('governanceContent')!;
+        try {
+            const data = await window.electronAPI.getGovernanceData();
+            govContent.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+            govContent.textContent = 'Failed to load governance data: ' + e;
+        }
+    }
+
     await loadProfiles();
     await loadAnalytics();
+    await loadGovernance();
 
     // Refresh analytics periodically
-    setInterval(loadAnalytics, 15000);
+    setInterval(() => {
+        loadAnalytics();
+        loadGovernance();
+    }, 15000);
 });

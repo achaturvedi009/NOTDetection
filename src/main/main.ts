@@ -16,6 +16,8 @@ import { WorkerNodeRuntime } from './distributed/worker';
 import { AnalyticsDataWarehouse } from './analytics/warehouse';
 import { FingerprintDistributionAnalyzer } from './analytics/analyzers/distribution';
 import { RiskPredictionEngine } from './analytics/predictor';
+import { GovernanceDataWarehouse } from './governance/database';
+import { IdentityAccessManager } from './governance/iam';
 import * as crypto from 'crypto';
 
 // Determine Paths
@@ -40,6 +42,10 @@ const automationGateway = new AutomationAPIGateway(automationController, 5543);
 // Initialize Analytics Engines
 const analyticsWarehouse = new AnalyticsDataWarehouse(userDataPath);
 
+// Initialize Governance Engines
+const governanceDb = new GovernanceDataWarehouse(userDataPath);
+const iam = new IdentityAccessManager(governanceDb);
+
 let mainWindow: BrowserWindow | null;
 
 // Node Execution Modes: 'local', 'control', or 'worker'
@@ -54,6 +60,11 @@ async function initCoreSystems() {
     // 2. Initialize Databases
     await storage.initialize();
     await analyticsWarehouse.initialize();
+    await governanceDb.initialize();
+
+    // 3. Initialize Governance Defaults
+    await iam.initializeDefaultAdmin();
+    automationGateway.iam = iam;
 
     // Wire up Analytics API layer
     automationGateway.analytics = analyticsWarehouse;
@@ -164,6 +175,35 @@ ipcMain.handle('get-analytics', async () => {
         threatLandscape,
         proxyHealth: defaultProxyHealth,
         recentDetections
+    };
+});
+
+ipcMain.handle('get-governance-data', async () => {
+    // In a real frontend, the user would login first to get an IAM token,
+    // but for local UI binding we assume the user is the local System Admin.
+
+    // Check if the current user is an admin
+    const adminUser = await iam.authenticate('admin', process.env.DEFAULT_ADMIN_PASSWORD || 'ChangeMe123!');
+    if (!adminUser) throw new Error('Local UI Governance access denied. Invalid default admin credentials.');
+
+    if (!iam.authorize(adminUser, 'read_audit')) {
+        throw new Error('Local UI Governance access denied. Missing read_audit permission.');
+    }
+
+    const auditLogs = await governanceDb.getAuditLogs(20);
+    const users = await governanceDb.getAllUsers();
+
+    // System Status mock
+    const systemStatus = {
+        activeBrowserSessions: browserLauncher.getActiveBrowsersMap().size,
+        maxConcurrencyLimit: (resourceManager as any).maxConcurrentProfiles,
+        freeMemoryGB: (os.freemem() / (1024 * 1024 * 1024)).toFixed(2)
+    };
+
+    return {
+        auditLogs,
+        users,
+        systemStatus
     };
 });
 
