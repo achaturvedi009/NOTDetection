@@ -8,7 +8,7 @@ import { FingerprintConfig } from '../profile/models';
 export class FingerprintInjector {
 
     public static generatePayload(config: FingerprintConfig): string {
-        return `
+        let payload = `
             (function(config) {
                 const overrideProperty = (obj, prop, value) => {
                     try {
@@ -30,6 +30,11 @@ export class FingerprintInjector {
 
                 // Hide WebDriver
                 overrideProperty(navigator, 'webdriver', false);
+
+                // Mobile specific properties
+                if (config.screen.isMobile) {
+                    overrideProperty(navigator, 'maxTouchPoints', 5); // Multi-touch
+                }
 
                 // --- Screen Spoofing (Backup to CDP emulation) ---
                 overrideProperty(screen, 'width', config.screen.width);
@@ -187,5 +192,13 @@ export class FingerprintInjector {
 
             })(${JSON.stringify(config)});
         `;
+
+        // Append battery payload if mobile config exists
+        if (config.mobile) {
+            const { BatterySimulator } = require('../mobile/battery');
+            return payload + BatterySimulator.generatePayload(config.mobile.battery);
+        }
+
+        return payload;
     }
 }

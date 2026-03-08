@@ -8,6 +8,8 @@ import { NetworkIdentityEngine } from '../network/engine';
 import { NetworkIdentityTemplateRegistry } from '../network/templates';
 import { NetworkConfig } from '../network/models';
 import { HumanInteractionController } from '../behavioral/controller';
+import { MobileNetworkSimulator } from '../mobile/network';
+import { MobileSensorEngine } from '../mobile/sensors';
 
 export class BrowserLauncher {
     private activeBrowsers: Map<string, puppeteer.Browser> = new Map();
@@ -100,16 +102,47 @@ export class BrowserLauncher {
 
         // 1. Emulate Hardware via CDP (Chrome DevTools Protocol)
         await page.setBypassCSP(true);
+
+        const isMobile = profile.fingerprint.screen.isMobile;
+
         await page.setUserAgent(profile.fingerprint.userAgent, {
-            architecture: 'x86', // or read from platform
+            architecture: isMobile ? 'arm' : 'x86', // or read from platform
             platform: profile.fingerprint.hardware.platform,
             platformVersion: profile.fingerprint.hardware.osVersion,
-            model: '',
-            mobile: false,
+            model: isMobile ? profile.fingerprint.mobile!.model : '',
+            mobile: isMobile,
             bitness: '64',
             wow64: false
         });
+
         await page.emulateTimezone(profile.fingerprint.timezone);
+
+        if (isMobile) {
+            await page.setViewport({
+                width: profile.fingerprint.screen.width,
+                height: profile.fingerprint.screen.height,
+                deviceScaleFactor: profile.fingerprint.screen.pixelRatio,
+                isMobile: true,
+                hasTouch: true,
+                isLandscape: profile.fingerprint.screen.orientation === 'landscape-primary'
+            });
+
+            // Initialize mobile network conditions
+            if (profile.fingerprint.mobile) {
+                await MobileNetworkSimulator.applyNetworkConditions(page as any, profile.fingerprint.mobile.network);
+            }
+
+            // Initialize mobile sensors
+            if (profile.fingerprint.sensors) {
+                const sensorEngine = new MobileSensorEngine(page as any, profile.fingerprint.sensors);
+                sensorEngine.startSimulation();
+
+                // Tie sensor cleanup to page close
+                page.on('close', () => {
+                    sensorEngine.stopSimulation();
+                });
+            }
+        }
 
         // 2. Inject Fingerprint Spoofing Payload on New Document
         const spoofPayload = FingerprintInjector.generatePayload(profile.fingerprint);

@@ -5,6 +5,7 @@ import { KeyboardCadenceEngine } from './keyboard';
 import { ScrollBehaviorEngine } from './scroll';
 import { SessionActivityModel } from './session';
 import { NavigationSimulator } from './navigation';
+import { TouchSimulationEngine } from '../mobile/touch';
 
 export class HumanInteractionController {
     public page: Page;
@@ -15,6 +16,7 @@ export class HumanInteractionController {
     public scroll: ScrollBehaviorEngine;
     public session: SessionActivityModel;
     public navigation: NavigationSimulator;
+    public touch?: TouchSimulationEngine;
 
     constructor(page: Page, config: BehavioralConfig) {
         this.page = page;
@@ -25,6 +27,10 @@ export class HumanInteractionController {
         this.scroll = new ScrollBehaviorEngine(page, config);
         this.session = new SessionActivityModel(config);
         this.navigation = new NavigationSimulator(page, config);
+
+        if (config.archetype === 'mobile') {
+            this.touch = new TouchSimulationEngine(page);
+        }
     }
 
     /**
@@ -36,12 +42,16 @@ export class HumanInteractionController {
 
         const viewport = this.page.viewport() || { width: 1920, height: 1080 };
 
-        // Randomly sweep the mouse
+        // Randomly sweep the mouse or tap if mobile
         const sweeps = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < sweeps; i++) {
             const rx = Math.random() * viewport.width;
             const ry = Math.random() * viewport.height;
-            await this.mouse.move(rx, ry);
+            if (this.touch) {
+                await this.touch.tap(rx, ry);
+            } else {
+                await this.mouse.move(rx, ry);
+            }
         }
 
         // Random scroll down

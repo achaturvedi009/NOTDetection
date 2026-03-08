@@ -30,6 +30,12 @@ export class FingerprintGenerator {
         // Step 4: Validate and auto-correct
         ConsistencyValidator.validateFingerprint(config);
 
+        // Mobile specific validation
+        if (config.screen.isMobile) {
+            const { MobileEnvironmentConsistencyEngine } = require('../mobile/consistency');
+            MobileEnvironmentConsistencyEngine.validateMobileIdentity(config);
+        }
+
         return { config, templateId: template.id, seed };
     }
 
@@ -48,7 +54,55 @@ export class FingerprintGenerator {
         const screen = pick(t.screenResolutions, 3);
         const renderer = pick(t.webglRendererList, 4);
 
-        const behavioral = BehavioralTemplates.getDeterministicBehavior(seedInt);
+        // Default to mobile archetype if template is mobile
+        let behavioral = BehavioralTemplates.getDeterministicBehavior(seedInt);
+        if (t.isMobile) {
+            behavioral = BehavioralTemplates.TEMPLATES['mobile'];
+        }
+
+        let mobileConfig;
+        let sensorConfig;
+
+        if (t.isMobile) {
+            const modelName = pick(t.modelNames || ['Unknown Device'], 5);
+            const netMode = pick(t.mobileNetworkModes || ['4g'], 6);
+
+            // Derive network type safely based on valid string unions
+            let effectiveType: 'slow-2g' | '2g' | '3g' | '4g' | '5g' = '4g';
+            if (['slow-2g', '2g', '3g', '4g', '5g'].includes(netMode)) {
+                effectiveType = netMode as any;
+            }
+
+            mobileConfig = {
+                manufacturer: t.manufacturer || 'Generic',
+                model: modelName,
+                battery: {
+                    charging: (seedInt % 2 === 0),
+                    level: 0.3 + ((seedInt % 70) / 100), // Random 30% to 99%
+                    chargingTime: 0,
+                    dischargingTime: Infinity
+                },
+                network: {
+                    connectionType: 'cellular' as const,
+                    effectiveType: effectiveType,
+                    rtt: 50,
+                    downlink: 10
+                }
+            };
+
+            sensorConfig = {
+                hasAccelerometer: true,
+                hasGyroscope: true,
+                hasAmbientLight: true,
+                hasProximity: true,
+                alpha: seedInt % 360,
+                beta: (seedInt % 180) - 90,
+                gamma: (seedInt % 180) - 90,
+                accelX: (seedInt % 10) * 0.1,
+                accelY: ((seedInt + 1) % 10) * 0.1,
+                accelZ: 9.81 + ((seedInt + 2) % 10) * 0.1
+            };
+        }
 
         return {
             userAgent: userAgent,
@@ -61,7 +115,7 @@ export class FingerprintGenerator {
                 hardwareConcurrency: pick(t.cpuCores, 5),
                 deviceMemory: pick(t.ramGB, 6),
                 platform: t.platform,
-                os: t.os === 'Windows' ? 'Windows NT 10.0' : t.os === 'macOS' ? 'Mac OS X' : 'Linux x86_64',
+                os: t.os === 'Windows' ? 'Windows NT 10.0' : t.os === 'macOS' ? 'Mac OS X' : t.os === 'iOS' ? 'iOS' : t.os === 'Android' ? 'Android' : 'Linux x86_64',
                 osVersion: osVersion,
                 browser: t.browser,
                 browserVersion: browserVersion
@@ -71,19 +125,19 @@ export class FingerprintGenerator {
                 height: screen.height,
                 colorDepth: 24,
                 pixelRatio: screen.pixelRatio,
-                isMobile: false,
-                hasTouch: false,
-                orientation: 'landscape-primary'
+                isMobile: !!t.isMobile,
+                hasTouch: !!t.isMobile,
+                orientation: t.isMobile ? 'portrait-primary' : 'landscape-primary'
             },
             webgl: {
                 vendor: t.webglVendor,
                 renderer: renderer,
-                unmaskedVendor: t.os === 'Windows' ? 'NVIDIA Corporation' : t.os === 'macOS' ? 'Apple' : 'Intel Open Source Technology Center',
+                unmaskedVendor: t.os === 'Windows' ? 'NVIDIA Corporation' : t.os === 'macOS' ? 'Apple' : t.os === 'iOS' ? 'Apple Inc.' : t.os === 'Android' ? 'Google Inc. (ARM)' : 'Intel Open Source Technology Center',
                 unmaskedRenderer: renderer,
                 noiseSeed: (seedInt * 13) % 1000000 // Deterministic noise seed
             },
             media: {
-                videoInputs: 1,
+                videoInputs: t.isMobile ? 2 : 1, // Front and back camera typically
                 audioInputs: 1,
                 audioOutputs: 1,
                 deviceIds: [
@@ -92,6 +146,8 @@ export class FingerprintGenerator {
                     this.deterministicHash(seedInt + 3)
                 ]
             },
+            mobile: mobileConfig,
+            sensors: sensorConfig,
             behavioral: behavioral,
             canvasNoiseSeed: (seedInt * 17) % 1000000,
             audioNoiseSeed: (seedInt * 19) % 1000000,

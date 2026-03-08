@@ -1,6 +1,6 @@
 export interface DeviceTemplate {
     id: string;
-    os: 'Windows' | 'macOS' | 'Linux' | 'Android';
+    os: 'Windows' | 'macOS' | 'Linux' | 'Android' | 'iOS';
     osVersionRange: string[];
     platform: string; // e.g., 'Win32', 'MacIntel'
     browser: 'Chrome' | 'Firefox' | 'Safari';
@@ -19,6 +19,12 @@ export interface DeviceTemplate {
 
     // Font Families typical to the OS
     baseFonts: string[];
+
+    // Mobile specific
+    isMobile?: boolean;
+    manufacturer?: string;
+    modelNames?: string[];
+    mobileNetworkModes?: string[];
 }
 
 export const DEVICE_TEMPLATES: DeviceTemplate[] = [
@@ -80,5 +86,49 @@ export const DEVICE_TEMPLATES: DeviceTemplate[] = [
             { width: 1920, height: 1080, pixelRatio: 1 }
         ],
         baseFonts: ['Ubuntu', 'Liberation Sans', 'DejaVu Sans']
+    },
+    {
+        id: 'android14_pixel8_chrome',
+        os: 'Android',
+        osVersionRange: ['14'],
+        platform: 'Linux armv8l',
+        browser: 'Chrome',
+        browserVersionRange: ['114.0.5735.196', '115.0.5790.136'],
+        cpuCores: [8],
+        ramGB: [8],
+        webglVendor: 'Google Inc. (ARM)',
+        webglRendererList: [
+            'ANGLE (ARM, Mali-G715, OpenGL ES 3.2)'
+        ],
+        screenResolutions: [
+            { width: 412, height: 915, pixelRatio: 2.625 }
+        ],
+        baseFonts: ['Roboto', 'Noto Sans'],
+        isMobile: true,
+        manufacturer: 'Google',
+        modelNames: ['Pixel 8', 'Pixel 8 Pro'],
+        mobileNetworkModes: ['5g', '4g', 'wifi']
+    },
+    {
+        id: 'ios17_iphone14pro_safari',
+        os: 'iOS',
+        osVersionRange: ['17_0_1', '17_1'],
+        platform: 'iPhone',
+        browser: 'Safari',
+        browserVersionRange: ['17.0', '17.1'],
+        cpuCores: [6], // A16 Bionic
+        ramGB: [6],
+        webglVendor: 'Apple Inc.',
+        webglRendererList: [
+            'Apple A16 GPU'
+        ],
+        screenResolutions: [
+            { width: 393, height: 852, pixelRatio: 3 }
+        ],
+        baseFonts: ['San Francisco', 'Helvetica Neue'],
+        isMobile: true,
+        manufacturer: 'Apple',
+        modelNames: ['iPhone 14 Pro'],
+        mobileNetworkModes: ['5g', '4g', 'wifi']
     }
 ];
