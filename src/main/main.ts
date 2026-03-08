@@ -6,6 +6,9 @@ import { EncryptionManager } from './security/encryption';
 import { ProfileManager } from './profile/manager';
 import { BrowserLauncher } from './browser/launcher';
 import { deviceRegistry } from './fingerprint/registry';
+import { LocalResourceManager } from './local/resource-manager';
+import { LocalOnlyAdapter } from './cloud/sync';
+import { KeyManager } from './security/key-manager';
 import * as crypto from 'crypto';
 
 // Determine Paths
@@ -19,23 +22,31 @@ const storage = new StorageLayer(dbPath, encryption);
 const profileManager = new ProfileManager(storage);
 const browserLauncher = new BrowserLauncher(profilesDataPath);
 
+// Initialize Local Orchestrators
+const cloudAdapter = new LocalOnlyAdapter(); // strictly offline
+const resourceManager = new LocalResourceManager(profilesDataPath, browserLauncher.getActiveBrowsersMap());
+
 let mainWindow: BrowserWindow | null;
+
+// Offline Mode Enforcement Flag
+const IS_OFFLINE_MODE = true;
 
 async function initCoreSystems() {
     // 1. Initialize Encryption
-    // Load strictly from env; if missing, fail gracefully or demand configuration.
-    // For local desktop orchestration, generate a strictly local machine key securely.
-    let masterKey = process.env.ANTI_DETECT_MASTER_KEY;
-    if (!masterKey) {
-        // Fallback to a persistent, locally isolated machine-specific hash
-        masterKey = crypto.createHash('sha256').update(os.userInfo().username + os.hostname()).digest('hex');
-    }
+    const masterKey = KeyManager.resolveMasterKey(userDataPath);
     encryption.initialize(masterKey);
 
     // 2. Initialize Database
     await storage.initialize();
 
-    // 3. Hydrate Device Profile Registry
+    if (IS_OFFLINE_MODE) {
+        console.log('[Boot Sequence] Local Enterprise Deployment Mode initialized. All cloud integrations are strictly disabled.');
+    }
+
+    // 3. Clean up orphaned resources to ensure efficient local disk usage
+    await resourceManager.cleanupOrphanedResources();
+
+    // 4. Hydrate Device Profile Registry
     const profiles = await storage.getAllProfiles();
     for (const pMeta of profiles) {
         const fullProfile = await storage.getProfile(pMeta.id);
@@ -88,6 +99,10 @@ ipcMain.handle('delete-profile', async (event, id: string) => {
 });
 
 ipcMain.handle('launch-profile', async (event, id: string) => {
+    if (!resourceManager.canLaunchProfile()) {
+        throw new Error('Local resources are exhausted. Please close an active profile before launching another.');
+    }
+
     const profile = await profileManager.getProfile(id);
     if (!profile) throw new Error('Profile not found');
 

@@ -172,4 +172,8 @@ export class BrowserLauncher {
             this.activeBrowsers.delete(id);
         }
     }
+
+    public getActiveBrowsersMap(): Map<string, puppeteer.Browser> {
+        return this.activeBrowsers;
+    }
 }
