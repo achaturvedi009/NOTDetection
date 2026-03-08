@@ -1,4 +1,5 @@
 import { BrowserSessionController } from './session';
+import { SelfHealingActionEngine } from '../detection/self-healing';
 
 export interface AutomationTaskStep {
     action: 'navigate' | 'click' | 'type' | 'scroll';
@@ -23,10 +24,22 @@ export class TaskExecutionEngine {
             const step = workflow.steps[i];
             console.log(`[TaskEngine] Executing step ${i+1}: ${step.action}`);
 
+            // Proactive Detection Check before stepping
+            await SelfHealingActionEngine.evaluateAndHeal(session.profile, session);
+
+            // If profile burned mid-session, abort safely
+            if (session.profile.health.threatLevel === 'critical') {
+                throw new Error(`Workflow aborted: Profile reached CRITICAL threat level and requires proxy rotation/rebalance.`);
+            }
+
             try {
                 await this.executeStep(session, step);
             } catch (error) {
                 console.error(`[TaskEngine] Step ${i+1} failed. Applying retry logic...`);
+
+                // Assess if the failure was due to a block/captcha before retrying blindly
+                await SelfHealingActionEngine.evaluateAndHeal(session.profile, session);
+
                 // Simple 1-time retry logic with a behavioral pause
                 await new Promise(r => setTimeout(r, 2000));
                 try {

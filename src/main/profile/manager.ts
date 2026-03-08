@@ -55,10 +55,13 @@ export class ProfileManager {
             lifecycleState: 'new',
             health: {
                 riskScore: 0.0,
+                threatLevel: 'low',
                 sessionCount: 0,
                 anomalyCount: 0,
                 lastHealthCheck: new Date(),
-                flags: []
+                flags: [],
+                proxyReputationScore: 1.0,
+                recentDetections: []
             },
             usage: {
                 historyCount: 0,

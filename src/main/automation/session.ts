@@ -1,5 +1,8 @@
 import { HumanInteractionController } from '../behavioral/controller';
 import { InteractionCommandEngine } from './commands';
+import { DetectionSignalMonitor } from '../detection/monitor';
+import { SelfHealingActionEngine } from '../detection/self-healing';
+import { Profile } from '../profile/models';
 
 /**
  * Manages the specific active browsing session, wrapping Puppeteer pages
@@ -9,11 +12,17 @@ export class BrowserSessionController {
     public behavior: HumanInteractionController;
     public commands: InteractionCommandEngine;
     public readonly sessionStartMs: number;
+    private detectionMonitor: DetectionSignalMonitor;
+    public profile: Profile;
 
-    constructor(behaviorController: HumanInteractionController) {
+    constructor(behaviorController: HumanInteractionController, profile: Profile) {
         this.behavior = behaviorController;
         this.commands = new InteractionCommandEngine(behaviorController);
         this.sessionStartMs = Date.now();
+        this.profile = profile;
+
+        // Initialize active detection monitoring
+        this.detectionMonitor = new DetectionSignalMonitor(this.behavior.page, this.profile);
     }
 
     public getSessionDurationMs(): number {

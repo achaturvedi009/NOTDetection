@@ -40,7 +40,7 @@ export class ProfileAutomationController {
 
         const behaviorController = await this.launcher.launchProfile(profile, execPath);
 
-        const sessionController = new BrowserSessionController(behaviorController);
+        const sessionController = new BrowserSessionController(behaviorController, profile);
         this.activeSessions.set(profileId, sessionController);
 
         return sessionController;

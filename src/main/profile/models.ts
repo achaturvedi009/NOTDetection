@@ -110,12 +110,24 @@ export interface FingerprintConfig {
 
 export type ProfileLifecycleState = 'new' | 'warming' | 'active' | 'mature' | 'aging' | 'retired';
 
+export type ThreatLevel = 'low' | 'moderate' | 'high' | 'critical';
+
+export interface DetectionEvent {
+    timestamp: Date;
+    type: 'captcha' | 'http_403' | 'js_anomaly' | 'proxy_timeout';
+    url: string;
+    severity: number;
+}
+
 export interface ProfileHealth {
     riskScore: number;          // 0.0 (safe) to 1.0 (highly risky)
+    threatLevel: ThreatLevel;
     sessionCount: number;
     anomalyCount: number;
     lastHealthCheck: Date;
     flags: string[];
+    proxyReputationScore: number; // 0.0 to 1.0
+    recentDetections: DetectionEvent[];
 }
 
 export interface ProfileUsageMetrics {
