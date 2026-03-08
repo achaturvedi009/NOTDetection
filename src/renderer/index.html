@@ -5,46 +5,604 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise Anti-Detect Browser</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f4f4f4; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { font-size: 24px; color: #333; }
-        .controls { margin-bottom: 20px; }
-        input, button { padding: 10px; margin-right: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #007bff; color: white; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .profile-list { list-style: none; padding: 0; }
-        .profile-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #ddd; }
-        .profile-actions button { margin-left: 5px; padding: 5px 10px; font-size: 14px; }
+        :root {
+            --primary-blue: #2563eb;
+            --border-color: #e5e7eb;
+            --bg-light: #f9fafb;
+            --text-dark: #1f2937;
+            --text-muted: #6b7280;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: var(--text-dark);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .banner-img {
+            height: 32px;
+            background-color: #4c1d95;
+            color: white;
+            padding: 4px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-blue);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            padding: 4px 12px 4px 4px;
+            border-radius: 20px;
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            background-color: #d1d5db;
+            border-radius: 50%;
+        }
+
+        /* Warning Banner */
+        .warning-banner {
+            margin: 16px 24px;
+            padding: 12px 16px;
+            background-color: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 6px;
+            color: #b45309;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-warning {
+            background-color: #fbbf24;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-warning-outline {
+            background-color: #fef3c7;
+            border: 1px solid #fde68a;
+            padding: 4px 12px;
+            border-radius: 4px;
+            color: #b45309;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 24px;
+        }
+
+        .tab {
+            padding: 12px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            color: var(--primary-blue);
+            border-bottom-color: var(--primary-blue);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            padding: 24px;
+            gap: 24px;
+        }
+
+        .left-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 12px;
+        }
+
+        .form-section {
+            margin-bottom: 32px;
+        }
+
+        .form-section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #9ca3af;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-section-title::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background-color: var(--border-color);
+        }
+
+        .form-row {
+            display: flex;
+            margin-bottom: 16px;
+            align-items: flex-start;
+        }
+
+        .form-label {
+            width: 120px;
+            font-size: 14px;
+            color: var(--text-dark);
+            padding-top: 8px;
+            text-align: right;
+            padding-right: 16px;
+        }
+
+        .form-input-container {
+            flex: 1;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            color: var(--text-dark);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary-blue);
+        }
+
+        .btn-group {
+            display: inline-flex;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .btn-group button {
+            padding: 8px 16px;
+            background: white;
+            border: none;
+            border-right: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+
+        .btn-group button:last-child {
+            border-right: none;
+        }
+
+        .btn-group button.active {
+            color: var(--primary-blue);
+            background-color: #eff6ff;
+            font-weight: 500;
+        }
+
+        .selector-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .selector-box.active {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background-color: #eff6ff;
+        }
+
+        .btn-outline {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* Right Panel - Overview */
+        .right-panel {
+            width: 340px;
+            background-color: var(--bg-light);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            overflow-y: auto;
+        }
+
+        .overview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .overview-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .new-fingerprint-btn {
+            color: var(--primary-blue);
+            background: none;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .fp-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+
+        .fp-label {
+            color: #9ca3af;
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .fp-value {
+            color: var(--text-dark);
+            text-align: right;
+            word-break: break-all;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            background: white;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 8px 32px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .btn-cancel {
+            background-color: white;
+            color: var(--text-dark);
+            border: 1px solid var(--border-color);
+            padding: 8px 32px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-cancel:hover {
+            background-color: #f3f4f6;
+        }
+
+        /* Hidden class for tabs */
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Profile Manager</h1>
-        <div class="controls">
-            <input type="text" id="profileName" placeholder="Enter Profile Name" />
-            <select id="proxyType">
-                <option value="direct">Direct (No Proxy)</option>
-                <option value="http">HTTP</option>
-                <option value="socks5">SOCKS5</option>
-            </select>
-            <input type="text" id="proxyHost" placeholder="Host (e.g. 1.2.3.4)" />
-            <input type="number" id="proxyPort" placeholder="Port" style="width: 80px;" />
-            <button id="createBtn">Create Profile</button>
+
+    <!-- Header -->
+    <div class="header">
+        <h1>New Browser Profile</h1>
+        <div class="header-actions">
+            <div class="banner-img">
+                Get 360 Extra Days With Annual Plan!
+            </div>
+            <button class="icon-btn">↺</button>
+            <button class="icon-btn">☰</button>
+            <div class="user-profile">
+                <div class="user-avatar"></div>
+                <div>
+                    <div style="font-weight: 500;">ashishchaturvedi</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Owner</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning Banner -->
+    <div class="warning-banner">
+        <span>⚠️ You haven't changed the password for over 100 days. To secure your account, it's recommended to reset your password or bind an authenticator.</span>
+        <button class="btn-warning">Edit password</button>
+        <button class="btn-warning-outline">Bind authenticator</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="general">General</div>
+        <div class="tab" data-tab="proxy">Proxy</div>
+        <div class="tab" data-tab="platform">Platform</div>
+        <div class="tab" data-tab="fingerprint">Fingerprint</div>
+        <div class="tab" data-tab="advanced">Advanced</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Left Panel -->
+        <div class="left-panel" id="tabContent">
+
+            <!-- General Tab Content -->
+            <div id="general-tab" class="tab-pane">
+                <div class="form-section-title">General</div>
+
+                <div class="form-row">
+                    <div class="form-label">Name</div>
+                    <div class="form-input-container">
+                        <input type="text" id="profileName" placeholder="Optional: profile name">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-label">Browser</div>
+                    <div class="form-input-container input-group">
+                        <div class="selector-box active">🌍 SunBrowser</div>
+                        <div class="selector-box">🌸 FlowerBrowser</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-label">OS</div>
+                    <div class="form-input-container input-group">
+                        <div class="selector-box active">🪟 Win</div>
+                        <div class="selector-box">🍎 Mac</div>
+                        <div class="selector-box">🐧 Lin</div>
+                        <div class="selector-box">🤖 And</div>
+                        <div class="selector-box">📱 iOS</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-label">User-Agent</div>
+                    <div class="form-input-container input-group">
+                        <select style="width: 120px;"><option>All</option></select>
+                        <input type="text" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.163 Safari/537.36" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proxy Tab Content -->
+            <div id="proxy-tab" class="tab-pane">
+                <div class="form-section-title">Proxy</div>
+
+                <div class="form-row">
+                    <div class="form-label">Proxy</div>
+                    <div class="form-input-container">
+                        <div class="btn-group">
+                            <button class="active">Custom</button>
+                            <button>Saved Proxies</button>
+                            <button>Proxy Provider</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-label">Proxy type</div>
+                    <div class="form-input-container">
+                        <select id="proxyType">
+                            <option value="direct">Direct (No Proxy)</option>
+                            <option value="http">HTTP</option>
+                            <option value="https">HTTPS</option>
+                            <option value="socks4">SOCKS4</option>
+                            <option value="socks5">SOCKS5</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="proxyConfigSection" class="hidden">
+                    <div class="form-row">
+                        <div class="form-label">Host:Port</div>
+                        <div class="form-input-container input-group">
+                            <input type="text" id="proxyHost" placeholder="Please enter host" style="flex: 2;">
+                            <span>:</span>
+                            <input type="number" id="proxyPort" placeholder="Port" style="flex: 1;">
+                            <button class="btn-outline">Check Proxy</button>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-label">Proxy username</div>
+                        <div class="form-input-container">
+                            <input type="text" id="proxyUsername" placeholder="Please enter user name(Optional)">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-label">Proxy Password</div>
+                        <div class="form-input-container">
+                            <input type="password" id="proxyPassword" placeholder="Enter password(Optional)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <ul id="profiles" class="profile-list">
-            <!-- Profiles loaded here -->
-        </ul>
+        <!-- Right Panel (Overview) -->
+        <div class="right-panel">
+            <div class="overview-header">
+                <h3>Overview</h3>
+                <button class="new-fingerprint-btn" id="newFpBtn">
+                    🔀 New fingerprint
+                </button>
+            </div>
 
-        <h2 style="margin-top: 40px; color: #333;">Analytics Dashboard</h2>
-        <div id="analyticsContent" style="background: #f9f9f9; padding: 15px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; white-space: pre-wrap; overflow-x: auto;">
-            Loading telemetry...
-        </div>
+            <div class="fp-item">
+                <div class="fp-label">Browser</div>
+                <div class="fp-value">SunBrowser [Auto]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">User-Agent</div>
+                <div class="fp-value">Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.163 Safari/537.36</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">WebRTC</div>
+                <div class="fp-value">Replace</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Timezone</div>
+                <div class="fp-value">Based on IP</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Location</div>
+                <div class="fp-value">[Allow] Based on IP</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Language</div>
+                <div class="fp-value">["English (United States)"]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Display language</div>
+                <div class="fp-value">English</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Screen Resolution</div>
+                <div class="fp-value">Random</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Fonts</div>
+                <div class="fp-value">385</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Canvas</div>
+                <div class="fp-value">Noise [30EC1AE0]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">WebGL Image</div>
+                <div class="fp-value">Noise [D2ADDCC9]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">AudioContext</div>
+                <div class="fp-value">Noise [CFCA1FE8]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">Media device</div>
+                <div class="fp-value">Noise [Auto]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">ClientRects</div>
+                <div class="fp-value">Noise [FB2B807C]</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">SpeechVoices</div>
+                <div class="fp-value">Noise</div>
+            </div>
+            <div class="fp-item">
+                <div class="fp-label">WebGL metadata</div>
+                <div class="fp-value">Google Inc. (Intel) ANGLE (Intel, Intel(R) HD Graphics Family (0x00000A16) Direct3D9Ex vs_3_0</div>
+            </div>
 
-        <h2 style="margin-top: 40px; color: #333;">Administrative Control Console</h2>
-        <div id="governanceContent" style="background: #eef2f5; padding: 15px; border: 1px solid #ccd5e0; border-radius: 4px; font-family: monospace; white-space: pre-wrap; overflow-x: auto;">
-            Loading governance & audit logs...
+            <div style="margin-top: auto; font-size: 11px; color: var(--text-muted); text-align: center;">
+                Set default values in <a href="#" style="color: var(--primary-blue); text-decoration: none;">Preferences</a>.
+            </div>
         </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <button class="btn-primary" id="okBtn">OK</button>
+        <button class="btn-cancel" id="cancelBtn">Cancel</button>
     </div>
 
     <script src="./renderer.bundle.js"></script>

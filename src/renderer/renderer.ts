@@ -14,41 +14,71 @@ declare global {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const profilesList = document.getElementById('profiles') as HTMLUListElement;
-    const createBtn = document.getElementById('createBtn') as HTMLButtonElement;
+    // Basic DOM elements
+    const okBtn = document.getElementById('okBtn') as HTMLButtonElement;
+    const cancelBtn = document.getElementById('cancelBtn') as HTMLButtonElement;
     const nameInput = document.getElementById('profileName') as HTMLInputElement;
     const proxyTypeSelect = document.getElementById('proxyType') as HTMLSelectElement;
     const proxyHostInput = document.getElementById('proxyHost') as HTMLInputElement;
     const proxyPortInput = document.getElementById('proxyPort') as HTMLInputElement;
+    const proxyConfigSection = document.getElementById('proxyConfigSection') as HTMLDivElement;
+    const newFpBtn = document.getElementById('newFpBtn') as HTMLButtonElement;
 
-    async function loadProfiles() {
-        profilesList.innerHTML = '';
-        const profiles = await window.electronAPI.getProfiles();
+    // Tab switching logic
+    const tabs = document.querySelectorAll('.tab');
+    const tabContent = document.getElementById('tabContent');
+    const tabPanes = document.querySelectorAll('.tab-pane');
 
-        profiles.forEach((p: any) => {
-            const li = document.createElement('li');
-            li.className = 'profile-item';
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active from all tabs
+            tabs.forEach(t => t.classList.remove('active'));
+            // Add active to clicked tab
+            tab.classList.add('active');
 
-            // Defend against XSS by using textContent for user-provided data
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = `${p.name} (${p.id.substring(0,8)})`;
+            const tabName = tab.getAttribute('data-tab');
 
-            const actionsDiv = document.createElement('div');
-            actionsDiv.className = 'profile-actions';
-            actionsDiv.innerHTML = `
-                <button onclick="launchProfile('${p.id}')">Launch</button>
-                <button onclick="deleteProfile('${p.id}')" style="background:#dc3545;">Delete</button>
-            `;
-
-            li.appendChild(nameSpan);
-            li.appendChild(actionsDiv);
-            profilesList.appendChild(li);
+            // Note: In a complete implementation, we'd render the full HTML for Platform, Fingerprint, Advanced.
+            // Here, we just toggle visibility between General and Proxy panes.
+            tabPanes.forEach((pane: any) => {
+                if (pane.id === `${tabName}-tab`) {
+                    pane.classList.remove('hidden');
+                } else {
+                    pane.classList.add('hidden');
+                }
+            });
         });
-    }
+    });
 
-    createBtn.addEventListener('click', async () => {
-        const name = nameInput.value.trim();
-        if (!name) return alert('Profile name required');
+    // Initialize tab visibility
+    const initTabs = () => {
+        tabPanes.forEach((pane: any) => {
+            if (pane.id !== 'general-tab') {
+                pane.classList.add('hidden');
+            }
+        });
+    };
+    initTabs();
+
+    // Proxy type select listener to show/hide host/port
+    proxyTypeSelect.addEventListener('change', () => {
+        if (proxyTypeSelect.value === 'direct') {
+            proxyConfigSection.classList.add('hidden');
+        } else {
+            proxyConfigSection.classList.remove('hidden');
+        }
+    });
+
+    // Generate new FP button effect (visual only for now)
+    newFpBtn.addEventListener('click', () => {
+        const hash = Math.random().toString(16).substring(2, 10).toUpperCase();
+        const canvasFp = document.querySelectorAll('.fp-value')[9]; // Canvas
+        if (canvasFp) canvasFp.textContent = `Noise [${hash}]`;
+    });
+
+    // Create Profile (OK button)
+    okBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim() || `Profile_${Math.random().toString(36).substring(2, 6)}`;
 
         const proxyType = proxyTypeSelect.value;
         let proxyConfig: any = { type: proxyType };
@@ -58,57 +88,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             const port = parseInt(proxyPortInput.value.trim());
 
             if (!host || isNaN(port)) {
-                return alert('Proxy host and port are required for non-direct proxies');
+                alert('Proxy host and port are required for non-direct proxies');
+                // Switch to proxy tab to show the error context
+                (document.querySelector('.tab[data-tab="proxy"]') as HTMLElement).click();
+                return;
             }
 
             proxyConfig.host = host;
             proxyConfig.port = port;
         }
 
-        await window.electronAPI.createProfile(name, proxyConfig);
-        nameInput.value = '';
-        proxyHostInput.value = '';
-        proxyPortInput.value = '';
-        proxyTypeSelect.value = 'direct';
-        await loadProfiles();
+        try {
+            await window.electronAPI.createProfile(name, proxyConfig);
+            alert(`Profile "${name}" created successfully!`);
+            // In a real app, you would redirect back to the profiles list view.
+            // For now, reset the form.
+            nameInput.value = '';
+            proxyTypeSelect.value = 'direct';
+            proxyTypeSelect.dispatchEvent(new Event('change'));
+            proxyHostInput.value = '';
+            proxyPortInput.value = '';
+        } catch (error) {
+            console.error(error);
+            alert(`Failed to create profile: ${error}`);
+        }
     });
 
-    (window as any).launchProfile = async (id: string) => {
-        await window.electronAPI.launchProfile(id);
-    };
-
-    (window as any).deleteProfile = async (id: string) => {
-        await window.electronAPI.deleteProfile(id);
-        await loadProfiles();
-    };
-
-    async function loadAnalytics() {
-        const analyticsContent = document.getElementById('analyticsContent')!;
-        try {
-            const data = await window.electronAPI.getAnalytics();
-            analyticsContent.textContent = JSON.stringify(data, null, 2);
-        } catch (e) {
-            analyticsContent.textContent = 'Failed to load analytics: ' + e;
-        }
-    }
-
-    async function loadGovernance() {
-        const govContent = document.getElementById('governanceContent')!;
-        try {
-            const data = await window.electronAPI.getGovernanceData();
-            govContent.textContent = JSON.stringify(data, null, 2);
-        } catch (e) {
-            govContent.textContent = 'Failed to load governance data: ' + e;
-        }
-    }
-
-    await loadProfiles();
-    await loadAnalytics();
-    await loadGovernance();
-
-    // Refresh analytics periodically
-    setInterval(() => {
-        loadAnalytics();
-        loadGovernance();
-    }, 15000);
+    cancelBtn.addEventListener('click', () => {
+        alert('Operation cancelled (Return to dashboard)');
+    });
 });
