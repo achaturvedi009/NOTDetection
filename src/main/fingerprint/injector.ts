@@ -173,6 +173,48 @@ export class FingerprintInjector {
                     });
                 }
 
+                // --- Audio Fingerprint Spoofing (OfflineAudioContext) ---
+                const originalGetChannelData = AudioBuffer.prototype.getChannelData;
+                AudioBuffer.prototype.getChannelData = function(channel) {
+                    const data = originalGetChannelData.apply(this, arguments);
+
+                    // We only want to inject noise once per buffer rendering
+                    if (this.__spoofed) return data;
+                    this.__spoofed = true;
+
+                    // Generate a deterministic pseudo-random float based on the audio seed
+                    const pseudoRand = (config.audioNoiseSeed * 0.0001) % 1;
+                    const noiseIndex = Math.floor(pseudoRand * data.length);
+
+                    // Inject a minuscule, deterministic value alteration (e.g. 0.0000001)
+                    // This changes the final sha256 hash of the audio buffer without corrupting audio playback
+                    if (noiseIndex < data.length) {
+                        data[noiseIndex] = data[noiseIndex] + 0.0000001;
+                    }
+
+                    return data;
+                };
+
+                // --- WebGL Extensions Enumeration Hardening ---
+                const getSupportedExtensionsProxy = function(original) {
+                    return function() {
+                        const exts = original.apply(this, arguments);
+                        if (!exts) return exts;
+
+                        // Remove automation or debugging extensions if they appear
+                        const filtered = exts.filter(e => !e.includes('WEBGL_debug'));
+                        return filtered;
+                    };
+                };
+
+                const webglTypesForExt = ['WebGLRenderingContext', 'WebGL2RenderingContext'];
+                for (const type of webglTypesForExt) {
+                    if (window[type]) {
+                        const originalGetSupportedExtensions = window[type].prototype.getSupportedExtensions;
+                        window[type].prototype.getSupportedExtensions = getSupportedExtensionsProxy(originalGetSupportedExtensions);
+                    }
+                }
+
                 // --- Media Devices Spoofing ---
                 if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
                     const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);

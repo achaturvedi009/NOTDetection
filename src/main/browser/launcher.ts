@@ -11,6 +11,9 @@ import { HumanInteractionController } from '../behavioral/controller';
 import { MobileNetworkSimulator } from '../mobile/network';
 import { MobileSensorEngine } from '../mobile/sensors';
 import { StealthHardeningEngine } from '../stealth/engine';
+import { RuntimeEnvironmentValidator } from './validator';
+import { NativeEnginePatchBuilder } from '../engine-patches/builder';
+import { ProfileWarmUpSystem } from '../lifecycle/warmup';
 
 export class BrowserLauncher {
     private activeBrowsers: Map<string, puppeteer.Browser> = new Map();
@@ -28,14 +31,21 @@ export class BrowserLauncher {
             throw new Error(`Profile ${profile.id} is already running.`);
         }
 
+        // 0. Pre-Flight Validation
+        RuntimeEnvironmentValidator.validateBeforeLaunch(profile, executablePath);
+
         const userDataDir = path.join(this.profilesDir, profile.id);
         if (!fs.existsSync(userDataDir)) {
             fs.mkdirSync(userDataDir, { recursive: true });
         }
 
+        // Phase 13: Execute Profile Warm-Up to synthetically age directory artifacts
+        ProfileWarmUpSystem.initializeWarmUpData(profile, userDataDir);
+
+        // Phase 13: Generate Native C++ Patch Manifest for BoringSSL/nghttp2 overrides
+        NativeEnginePatchBuilder.generatePatchManifest(profile.id, profile.fingerprint, userDataDir);
+
         // Securely pass the fingerprint configuration to the custom Chromium fork.
-        // The custom fork is engineered to read `fingerprint.json` from the user-data-dir on startup
-        // and inject it straight into Blink/V8 engines before pages load.
         const fpFile = path.join(userDataDir, 'fingerprint.json');
         fs.writeFileSync(fpFile, JSON.stringify(profile.fingerprint));
 
