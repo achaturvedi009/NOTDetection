@@ -9,6 +9,8 @@ import { deviceRegistry } from './fingerprint/registry';
 import { LocalResourceManager } from './local/resource-manager';
 import { LocalOnlyAdapter } from './cloud/sync';
 import { KeyManager } from './security/key-manager';
+import { ProfileAutomationController } from './automation/controller';
+import { AutomationAPIGateway } from './api/automation';
 import * as crypto from 'crypto';
 
 // Determine Paths
@@ -25,6 +27,10 @@ const browserLauncher = new BrowserLauncher(profilesDataPath);
 // Initialize Local Orchestrators
 const cloudAdapter = new LocalOnlyAdapter(); // strictly offline
 const resourceManager = new LocalResourceManager(profilesDataPath, browserLauncher.getActiveBrowsersMap());
+
+// Initialize Automation Framework
+const automationController = new ProfileAutomationController(profileManager, browserLauncher);
+const automationGateway = new AutomationAPIGateway(automationController, 5543);
 
 let mainWindow: BrowserWindow | null;
 
@@ -46,7 +52,10 @@ async function initCoreSystems() {
     // 3. Clean up orphaned resources to ensure efficient local disk usage
     await resourceManager.cleanupOrphanedResources();
 
-    // 4. Hydrate Device Profile Registry
+    // 4. Start Local Automation API
+    automationGateway.start();
+
+    // 5. Hydrate Device Profile Registry
     const profiles = await storage.getAllProfiles();
     for (const pMeta of profiles) {
         const fullProfile = await storage.getProfile(pMeta.id);
