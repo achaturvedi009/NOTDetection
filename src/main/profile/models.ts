@@ -11,6 +11,10 @@ export interface ScreenConfig {
     height: number;
     colorDepth: number;
     pixelRatio: number;
+    // Mobile Emulation
+    isMobile: boolean;
+    hasTouch: boolean;
+    orientation: 'portrait-primary' | 'landscape-primary';
 }
 
 export interface WebGLConfig {
@@ -38,6 +42,13 @@ export interface MediaDeviceConfig {
     deviceIds: string[];
 }
 
+export interface SensorConfig {
+    hasAccelerometer: boolean;
+    hasGyroscope: boolean;
+    hasAmbientLight: boolean;
+    hasProximity: boolean;
+}
+
 export interface FingerprintConfig {
     userAgent: string;
     language: string;
@@ -49,6 +60,7 @@ export interface FingerprintConfig {
     screen: ScreenConfig;
     webgl: WebGLConfig;
     media: MediaDeviceConfig;
+    sensors?: SensorConfig;
     canvasNoiseSeed: number;
     audioNoiseSeed: number;
     fontMaskSeed: number;

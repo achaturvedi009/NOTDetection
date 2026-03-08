@@ -1,87 +1,102 @@
+import * as crypto from 'crypto';
 import { FingerprintConfig } from '../profile/models';
+import { DEVICE_TEMPLATES, DeviceTemplate } from './template';
+import { ConsistencyValidator } from './validator';
 
 export class FingerprintGenerator {
 
     /**
-     * Generates a fully randomized, yet internally consistent device fingerprint.
-     * In an enterprise setup, this would load templates from a curated database
-     * of real-world device signals to ensure the resulting fingerprint passes
-     * uniqueness scoring without looking anomalous (like a 36-core PC with 1GB RAM).
+     * Deterministic Generation Pipeline
+     * Step 1: Select device template
+     * Step 2: Generate profile seed
+     * Step 3: Derive values from template using seed
+     * Step 4: Validate with consistency matrix
      */
-    public static generateRealisticFingerprint(): FingerprintConfig {
-        const isMac = Math.random() > 0.5;
-        const os = isMac ? 'Mac OS X' : 'Windows NT 10.0';
-        const osVersion = isMac ? '10_15_7' : '10.0';
-        const platform = isMac ? 'MacIntel' : 'Win32';
+    public static generateConsistentFingerprint(seedStr?: string): { config: FingerprintConfig, templateId: string, seed: string } {
+        // Step 2: Seed Generation
+        const seed = seedStr || crypto.randomBytes(16).toString('hex');
 
-        // Ensure valid combinations for hardware concurrency and memory
-        const validCores = [4, 8, 12, 16];
-        const cores = validCores[Math.floor(Math.random() * validCores.length)];
+        // Use seed to select index deterministically
+        const seedInt = parseInt(seed.substring(0, 8), 16);
 
-        const validRam = [8, 16, 32];
-        let memory = validRam[Math.floor(Math.random() * validRam.length)];
-        if (cores === 16) memory = 32; // Consistency rule: high cores usually have high RAM
+        // Step 1: Select Template
+        const templateIndex = seedInt % DEVICE_TEMPLATES.length;
+        const template = DEVICE_TEMPLATES[templateIndex];
 
-        // Select realistic screen resolution
-        const resolutions = [
-            { w: 1920, h: 1080 },
-            { w: 2560, h: 1440 },
-            { w: 1440, h: 900 },
-            { w: 1366, h: 768 }
-        ];
-        const res = resolutions[Math.floor(Math.random() * resolutions.length)];
+        // Step 3: Derive Values
+        const config = this.deriveFromTemplate(template, seedInt);
 
-        // Randomize graphic cards based on OS
-        const macGPUs = ['Apple M1', 'Apple M2', 'Intel Iris Plus Graphics 640'];
-        const winGPUs = ['NVIDIA GeForce RTX 3060', 'AMD Radeon RX 6700 XT', 'Intel(R) UHD Graphics 770'];
-        const gpu = isMac
-            ? macGPUs[Math.floor(Math.random() * macGPUs.length)]
-            : winGPUs[Math.floor(Math.random() * winGPUs.length)];
+        // Step 4: Validate and auto-correct
+        ConsistencyValidator.validateFingerprint(config);
 
-        const browserVersion = `114.0.${Math.floor(Math.random() * 1000)}.${Math.floor(Math.random() * 100)}`;
-        const userAgent = isMac
-            ? `Mozilla/5.0 (Macintosh; Intel Mac OS X ${osVersion}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion} Safari/537.36`
-            : `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion} Safari/537.36`;
+        return { config, templateId: template.id, seed };
+    }
+
+    private static deriveFromTemplate(t: DeviceTemplate, seedInt: number): FingerprintConfig {
+        const pick = <T>(arr: T[], offset: number = 0): T => arr[(seedInt + offset) % arr.length];
+
+        const osVersion = pick(t.osVersionRange, 1);
+        const browserVersion = pick(t.browserVersionRange, 2);
+
+        const userAgentOS = t.os === 'macOS' ? `Intel Mac OS X ${osVersion}` :
+                            t.os === 'Windows' ? `Windows NT ${osVersion}; Win64; x64` :
+                            `X11; Linux ${osVersion}`;
+
+        const userAgent = `Mozilla/5.0 (${userAgentOS}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion} Safari/537.36`;
+
+        const screen = pick(t.screenResolutions, 3);
+        const renderer = pick(t.webglRendererList, 4);
 
         return {
             userAgent: userAgent,
             language: 'en-US',
             languages: ['en-US', 'en'],
-            timezone: 'America/New_York',
+            timezone: 'America/New_York', // In production, this maps dynamically to Proxy Geo
             timezoneOffset: 240,
-            doNotTrack: false,
+            doNotTrack: (seedInt % 2) === 0,
             hardware: {
-                hardwareConcurrency: cores,
-                deviceMemory: memory,
-                platform: platform,
-                os: os,
+                hardwareConcurrency: pick(t.cpuCores, 5),
+                deviceMemory: pick(t.ramGB, 6),
+                platform: t.platform,
+                os: t.os === 'Windows' ? 'Windows NT 10.0' : t.os === 'macOS' ? 'Mac OS X' : 'Linux x86_64',
                 osVersion: osVersion,
-                browser: 'Chrome',
+                browser: t.browser,
                 browserVersion: browserVersion
             },
             screen: {
-                width: res.w,
-                height: res.h,
+                width: screen.width,
+                height: screen.height,
                 colorDepth: 24,
-                pixelRatio: isMac ? 2 : 1 // Retina displays typically have pixelRatio 2
+                pixelRatio: screen.pixelRatio,
+                isMobile: false,
+                hasTouch: false,
+                orientation: 'landscape-primary'
             },
             webgl: {
-                vendor: 'Google Inc. (Apple)' /* WebGL unmasked typically varies */,
-                renderer: 'ANGLE (Apple, Apple M1, OpenGL 4.1)',
-                unmaskedVendor: isMac ? 'Apple' : 'NVIDIA Corporation',
-                unmaskedRenderer: gpu,
-                noiseSeed: Math.random() * 1000000
+                vendor: t.webglVendor,
+                renderer: renderer,
+                unmaskedVendor: t.os === 'Windows' ? 'NVIDIA Corporation' : t.os === 'macOS' ? 'Apple' : 'Intel Open Source Technology Center',
+                unmaskedRenderer: renderer,
+                noiseSeed: (seedInt * 13) % 1000000 // Deterministic noise seed
             },
             media: {
                 videoInputs: 1,
                 audioInputs: 1,
                 audioOutputs: 1,
-                deviceIds: [this.generateDeviceId(), this.generateDeviceId(), this.generateDeviceId()]
+                deviceIds: [
+                    this.deterministicHash(seedInt + 1),
+                    this.deterministicHash(seedInt + 2),
+                    this.deterministicHash(seedInt + 3)
+                ]
             },
-            canvasNoiseSeed: Math.random() * 1000000,
-            audioNoiseSeed: Math.random() * 1000000,
-            fontMaskSeed: Math.random() * 1000000
+            canvasNoiseSeed: (seedInt * 17) % 1000000,
+            audioNoiseSeed: (seedInt * 19) % 1000000,
+            fontMaskSeed: (seedInt * 23) % 1000000
         };
+    }
+
+    private static deterministicHash(input: number): string {
+        return crypto.createHash('sha256').update(input.toString()).digest('hex').substring(0, 16);
     }
 
     private static generateDeviceId(): string {

@@ -5,6 +5,8 @@ import { StorageLayer } from './storage/database';
 import { EncryptionManager } from './security/encryption';
 import { ProfileManager } from './profile/manager';
 import { BrowserLauncher } from './browser/launcher';
+import { deviceRegistry } from './fingerprint/registry';
+import * as crypto from 'crypto';
 
 // Determine Paths
 const userDataPath = path.join(os.homedir(), '.anti_detect_browser');
@@ -21,12 +23,35 @@ let mainWindow: BrowserWindow | null;
 
 async function initCoreSystems() {
     // 1. Initialize Encryption
-    // Load from env, fallback to secure auto-generated string for testing
-    const masterKey = process.env.ANTI_DETECT_MASTER_KEY || 'default-testing-master-key-123';
+    // Load strictly from env; if missing, fail gracefully or demand configuration.
+    // For local desktop orchestration, generate a strictly local machine key securely.
+    let masterKey = process.env.ANTI_DETECT_MASTER_KEY;
+    if (!masterKey) {
+        // Fallback to a persistent, locally isolated machine-specific hash
+        masterKey = crypto.createHash('sha256').update(os.userInfo().username + os.hostname()).digest('hex');
+    }
     encryption.initialize(masterKey);
 
     // 2. Initialize Database
     await storage.initialize();
+
+    // 3. Hydrate Device Profile Registry
+    const profiles = await storage.getAllProfiles();
+    for (const pMeta of profiles) {
+        const fullProfile = await storage.getProfile(pMeta.id);
+        if (fullProfile && fullProfile.fingerprint) {
+            // Re-hydrate the memory registry so unique seeds are persisted across restarts
+            deviceRegistry.register({
+                profileId: fullProfile.id,
+                templateId: 'unknown', // Storing the exact template isn't critical for uniqueness validation
+                seed: String(fullProfile.fingerprint.canvasNoiseSeed), // Use canvas seed as unique deterministic identifier
+                os: fullProfile.fingerprint.hardware?.os || '',
+                browser: fullProfile.fingerprint.hardware?.browser || '',
+                gpu: fullProfile.fingerprint.webgl?.unmaskedRenderer || '',
+                resolution: fullProfile.fingerprint.screen ? `${fullProfile.fingerprint.screen.width}x${fullProfile.fingerprint.screen.height}` : ''
+            });
+        }
+    }
 }
 
 async function createWindow() {

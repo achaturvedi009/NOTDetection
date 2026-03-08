@@ -2,6 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { StorageLayer } from '../storage/database';
 import { Profile, ProxyConfig, FingerprintConfig } from './models';
 import { FingerprintGenerator } from '../fingerprint/generator';
+import { deviceRegistry } from '../fingerprint/registry';
+import { ConsistencyValidator } from '../fingerprint/validator';
 
 export class ProfileManager {
     private storage: StorageLayer;
@@ -16,19 +18,53 @@ export class ProfileManager {
         // Default proxy if none provided
         const defaultProxy: ProxyConfig = proxy || { type: 'direct' };
 
-        // Default advanced fingerprint using Phase 2 Generator if none provided
-        const defaultFingerprint: FingerprintConfig = fingerprint || FingerprintGenerator.generateRealisticFingerprint();
+        // Default advanced fingerprint using Phase 2.5 Consistency Generator if none provided
+        let defaultFingerprint: FingerprintConfig;
+        if (fingerprint) {
+            defaultFingerprint = fingerprint;
+        } else {
+            // Generate until we get a unique seed with good entropy
+            let isUnique = false;
+            let result;
+            while (!isUnique) {
+                result = FingerprintGenerator.generateConsistentFingerprint();
+                if (deviceRegistry.isSeedUnique(result.seed) && ConsistencyValidator.calculateEntropyScore(result.config) > 0.5) {
+                    isUnique = true;
+                    defaultFingerprint = result.config;
+
+                    // Register the fingerprint
+                    deviceRegistry.register({
+                        profileId: id,
+                        templateId: result.templateId,
+                        seed: result.seed,
+                        os: result.config.hardware.os,
+                        browser: result.config.hardware.browser,
+                        gpu: result.config.webgl.unmaskedRenderer,
+                        resolution: `${result.config.screen.width}x${result.config.screen.height}`
+                    });
+                }
+            }
+        }
 
         const newProfile: Profile = {
             id,
             name,
             createdAt: new Date(),
             proxy: defaultProxy,
-            fingerprint: defaultFingerprint
+            fingerprint: defaultFingerprint!
         };
 
         await this.storage.insertProfile(id, name, newProfile);
         return newProfile;
+    }
+
+    public async bulkCreateProfiles(baseName: string, count: number): Promise<Profile[]> {
+        const created: Profile[] = [];
+        for (let i = 0; i < count; i++) {
+            const profile = await this.createProfile(`${baseName} - ${i + 1}`);
+            created.push(profile);
+        }
+        return created;
     }
 
     public async getProfile(id: string): Promise<Profile | null> {

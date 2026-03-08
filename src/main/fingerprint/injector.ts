@@ -69,7 +69,9 @@ export class FingerprintInjector {
                 // without modifying the visual DOM element (putImageData is not called on the original context).
                 const injectNoise = function(data) {
                     if (data && data.length) {
-                        const noiseIndex = Math.floor((config.canvasNoiseSeed % 1) * (data.length / 4)) * 4;
+                        // Use a deterministic pseudo-random float based on the seed
+                        const pseudoRand = (config.canvasNoiseSeed * 0.0001) % 1;
+                        const noiseIndex = Math.floor(pseudoRand * (data.length / 4)) * 4;
                         if (noiseIndex < data.length) {
                             // Slightly alter red channel
                             data[noiseIndex] = data[noiseIndex] ^ 1;
@@ -77,8 +79,10 @@ export class FingerprintInjector {
                     }
                 };
 
-                // Patch 2D getImageData
+                // Use the unpatched native method internally so we don't double-apply the noise
                 const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+
+                // Patch 2D getImageData for public scripts
                 CanvasRenderingContext2D.prototype.getImageData = function() {
                     const imageData = originalGetImageData.apply(this, arguments);
                     injectNoise(imageData.data);
@@ -94,7 +98,8 @@ export class FingerprintInjector {
                     const ctx = clone.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(this, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, clone.width, clone.height);
+                        // Call the unpatched getImageData to get raw pixels safely
+                        const imageData = originalGetImageData.call(ctx, 0, 0, clone.width, clone.height);
                         injectNoise(imageData.data);
                         ctx.putImageData(imageData, 0, 0);
                         return originalToDataURL.call(clone, type, encoderOptions);
@@ -111,7 +116,8 @@ export class FingerprintInjector {
                     const ctx = clone.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(this, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, clone.width, clone.height);
+                        // Call the unpatched getImageData to get raw pixels safely
+                        const imageData = originalGetImageData.call(ctx, 0, 0, clone.width, clone.height);
                         injectNoise(imageData.data);
                         ctx.putImageData(imageData, 0, 0);
                         return originalToBlob.call(clone, callback, type, quality);
@@ -148,7 +154,7 @@ export class FingerprintInjector {
                     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
                         get() {
                             const val = originalOffsetWidth.get.call(this);
-                            return val === 0 ? val : val + (config.fontMaskSeed % 2 > 1 ? 1 : 0);
+                            return val === 0 ? val : val + (config.fontMaskSeed % 2 !== 0 ? 1 : 0);
                         }
                     });
                 }
@@ -157,7 +163,7 @@ export class FingerprintInjector {
                     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
                         get() {
                             const val = originalOffsetHeight.get.call(this);
-                            return val === 0 ? val : val + (config.fontMaskSeed % 2 > 1 ? 1 : 0);
+                            return val === 0 ? val : val + (config.fontMaskSeed % 2 !== 0 ? 1 : 0);
                         }
                     });
                 }
