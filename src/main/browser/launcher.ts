@@ -10,6 +10,7 @@ import { NetworkConfig } from '../network/models';
 import { HumanInteractionController } from '../behavioral/controller';
 import { MobileNetworkSimulator } from '../mobile/network';
 import { MobileSensorEngine } from '../mobile/sensors';
+import { StealthHardeningEngine } from '../stealth/engine';
 
 export class BrowserLauncher {
     private activeBrowsers: Map<string, puppeteer.Browser> = new Map();
@@ -73,18 +74,22 @@ export class BrowserLauncher {
         const networkFlags = NetworkIdentityEngine.compileNetworkFlags(profile.id, networkConfig);
         args.push(...networkFlags);
 
+        // Stealth Component: Add stealth-hardened browser flags
+        args.push(...StealthHardeningEngine.getSanitizedChromiumFlags());
+
         let requiresAuth = false;
         if (advancedProxy.username && advancedProxy.password) {
             requiresAuth = true;
         }
 
         // 9. Launch browser instance
+        const ignoredArgs = StealthHardeningEngine.getIgnoredPuppeteerArgs();
         const browser = await puppeteer.launch({
             executablePath: executablePath,
             args: args,
             headless: false,
             defaultViewport: null, // Allow custom window sizes
-            ignoreDefaultArgs: ["--enable-automation"] // Hide puppeteer flag
+            ignoreDefaultArgs: ignoredArgs
         });
 
         this.activeBrowsers.set(profile.id, browser);
@@ -147,6 +152,10 @@ export class BrowserLauncher {
         // 2. Inject Fingerprint Spoofing Payload on New Document
         const spoofPayload = FingerprintInjector.generatePayload(profile.fingerprint);
         await page.evaluateOnNewDocument(spoofPayload);
+
+        // Stealth Component: Inject Stealth Hardening payload to defeat WebDriver detection
+        const stealthPayload = StealthHardeningEngine.compileStealthPayload(profile.fingerprint);
+        await page.evaluateOnNewDocument(stealthPayload);
 
         // Optional: Navigate to a leak testing page to verify fingerprint upon launch
         await page.goto('https://abouthero.com'); // Example test page
