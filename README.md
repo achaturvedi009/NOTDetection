@@ -40,6 +40,11 @@ This platform was developed across 12 rigorous architectural phases, resulting i
 - **Enterprise Policy Engine:** Enforces system-wide constraints on OS generation and allowed proxy types.
 - **Telemetry Dashboard:** Live UI streaming OS distributions, proxy health latency via native ICMP, and real-time threat landscapes.
 
+### 10. Real Device Fingerprint Dataset
+- **High-Fidelity Generation:** Instead of random synthetic combinations, device identities are forged from structured, real-world templates (e.g. `iPhone 14 Pro`, `Samsung Galaxy S23`, `Apple M2 Silicon`).
+- **Hardware Consistency:** Restricts invalid configurations securely (e.g. automatically discarding non-Apple GPUs on macOS profiles or stopping Safari requests from generating on Windows).
+- **Entropy Weighting:** Profile OS and GPU assignments map dynamically to realistic market-share distributions (~60% desktop/Windows, ~20% Mac, ~20% Mobile) ensuring farm clusters look like organic crowds.
+
 ---
 
 ## 🛠 Technology Stack

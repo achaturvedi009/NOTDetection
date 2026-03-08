@@ -3,6 +3,8 @@ import { FingerprintConfig } from '../profile/models';
 import { DEVICE_TEMPLATES, DeviceTemplate } from './template';
 import { ConsistencyValidator } from './validator';
 import { BehavioralTemplates } from '../behavioral/templates';
+import { DatasetTemplateSelector } from './dataset/selector';
+import { GPU_DATABASE } from './dataset/gpu';
 
 export class FingerprintGenerator {
 
@@ -20,12 +22,11 @@ export class FingerprintGenerator {
         // Use seed to select index deterministically
         const seedInt = parseInt(seed.substring(0, 8), 16);
 
-        // Step 1: Select Template
-        const templateIndex = seedInt % DEVICE_TEMPLATES.length;
-        const template = DEVICE_TEMPLATES[templateIndex];
+        // Step 1: Select Template using High-Fidelity Dataset Engine
+        const template = DatasetTemplateSelector.buildDynamicTemplate(seedInt);
 
         // Step 3: Derive Values
-        const config = this.deriveFromTemplate(template, seedInt);
+        const config = this.deriveFromDatasetTemplate(template, seedInt);
 
         // Step 4: Validate and auto-correct
         ConsistencyValidator.validateFingerprint(config);
@@ -36,55 +37,72 @@ export class FingerprintGenerator {
             MobileEnvironmentConsistencyEngine.validateMobileIdentity(config);
         }
 
-        return { config, templateId: template.id, seed };
+        return { config, templateId: template.deviceId, seed };
     }
 
-    private static deriveFromTemplate(t: DeviceTemplate, seedInt: number): FingerprintConfig {
+    // Legacy support kept intact, migrating derive logic to use Phase 14 Dataset
+    private static deriveFromDatasetTemplate(t: any, seedInt: number): FingerprintConfig {
         const pick = <T>(arr: T[], offset: number = 0): T => arr[(seedInt + offset) % arr.length];
 
-        const osVersion = pick(t.osVersionRange, 1);
+        const osVersion = t.osVersion;
         const browserVersion = pick(t.browserVersionRange, 2);
 
-        const userAgentOS = t.os === 'macOS' ? `Intel Mac OS X ${osVersion}` :
-                            t.os === 'Windows' ? `Windows NT ${osVersion}; Win64; x64` :
-                            `X11; Linux ${osVersion}`;
+        let userAgentOS = '';
+        let platformString = '';
+        let formalOsString = '';
+
+        if (t.os.includes('Windows')) {
+            userAgentOS = `Windows NT ${osVersion}; Win64; x64`;
+            platformString = 'Win32';
+            formalOsString = 'Windows NT 10.0';
+        } else if (t.os.includes('macOS')) {
+            userAgentOS = `Macintosh; Intel Mac OS X ${osVersion}`;
+            platformString = 'MacIntel';
+            formalOsString = 'Mac OS X';
+        } else if (t.os.includes('iOS')) {
+            userAgentOS = `iPhone; CPU iPhone OS ${osVersion.replace(/\./g, '_')} like Mac OS X`;
+            platformString = 'iPhone';
+            formalOsString = 'iOS';
+        } else if (t.os.includes('Android')) {
+            userAgentOS = `Linux; Android ${osVersion}; Pixel 8`;
+            platformString = 'Linux armv8l';
+            formalOsString = 'Android';
+        } else {
+            userAgentOS = `X11; Linux x86_64`;
+            platformString = 'Linux x86_64';
+            formalOsString = 'Linux';
+        }
 
         const userAgent = `Mozilla/5.0 (${userAgentOS}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion} Safari/537.36`;
 
-        const screen = pick(t.screenResolutions, 3);
-        const renderer = pick(t.webglRendererList, 4);
+        const screen: any = pick(t.screenResolutions, 3);
 
-        // Default to mobile archetype if template is mobile
+        // Grab a matching GPU from the database
+        const compatibleGPUs = GPU_DATABASE.filter(g => g.compatibleOS.includes(t.os));
+        const gpu = compatibleGPUs.length > 0 ? pick(compatibleGPUs, 4) : GPU_DATABASE[0];
+
+        const isMobile = t.category === 'mobile';
         let behavioral = BehavioralTemplates.getDeterministicBehavior(seedInt);
-        if (t.isMobile) {
+        if (isMobile) {
             behavioral = BehavioralTemplates.TEMPLATES['mobile'];
         }
 
         let mobileConfig;
         let sensorConfig;
 
-        if (t.isMobile) {
-            const modelName = pick(t.modelNames || ['Unknown Device'], 5);
-            const netMode = pick(t.mobileNetworkModes || ['4g'], 6);
-
-            // Derive network type safely based on valid string unions
-            let effectiveType: 'slow-2g' | '2g' | '3g' | '4g' | '5g' = '4g';
-            if (['slow-2g', '2g', '3g', '4g', '5g'].includes(netMode)) {
-                effectiveType = netMode as any;
-            }
-
+        if (isMobile) {
             mobileConfig = {
-                manufacturer: t.manufacturer || 'Generic',
-                model: modelName,
+                manufacturer: t.os.includes('iOS') ? 'Apple' : 'Google',
+                model: t.os.includes('iOS') ? 'iPhone 14 Pro' : 'Pixel 8',
                 battery: {
                     charging: (seedInt % 2 === 0),
-                    level: 0.3 + ((seedInt % 70) / 100), // Random 30% to 99%
+                    level: 0.3 + ((seedInt % 70) / 100),
                     chargingTime: 0,
                     dischargingTime: Infinity
                 },
                 network: {
                     connectionType: 'cellular' as const,
-                    effectiveType: effectiveType,
+                    effectiveType: '5g' as const,
                     rtt: 50,
                     downlink: 10
                 }
@@ -105,39 +123,39 @@ export class FingerprintGenerator {
         }
 
         return {
-            userAgent: userAgent,
+            userAgent: userAgent as string,
             language: 'en-US',
             languages: ['en-US', 'en'],
-            timezone: 'America/New_York', // In production, this maps dynamically to Proxy Geo
+            timezone: 'America/New_York',
             timezoneOffset: 240,
             doNotTrack: (seedInt % 2) === 0,
             hardware: {
-                hardwareConcurrency: pick(t.cpuCores, 5),
-                deviceMemory: pick(t.ramGB, 6),
-                platform: t.platform,
-                os: t.os === 'Windows' ? 'Windows NT 10.0' : t.os === 'macOS' ? 'Mac OS X' : t.os === 'iOS' ? 'iOS' : t.os === 'Android' ? 'Android' : 'Linux x86_64',
+                hardwareConcurrency: pick(t.cpuCoreCount, 5) as number,
+                deviceMemory: pick(t.memorySizeGB, 6) as number,
+                platform: platformString,
+                os: formalOsString,
                 osVersion: osVersion,
-                browser: t.browser,
-                browserVersion: browserVersion
+                browser: t.browserFamily,
+                browserVersion: browserVersion as string
             },
             screen: {
                 width: screen.width,
                 height: screen.height,
-                colorDepth: 24,
+                colorDepth: t.colorDepth,
                 pixelRatio: screen.pixelRatio,
-                isMobile: !!t.isMobile,
-                hasTouch: !!t.isMobile,
-                orientation: t.isMobile ? 'portrait-primary' : 'landscape-primary'
+                isMobile: isMobile,
+                hasTouch: isMobile,
+                orientation: isMobile ? 'portrait-primary' : 'landscape-primary'
             },
             webgl: {
-                vendor: t.webglVendor,
-                renderer: renderer,
-                unmaskedVendor: t.os === 'Windows' ? 'NVIDIA Corporation' : t.os === 'macOS' ? 'Apple' : t.os === 'iOS' ? 'Apple Inc.' : t.os === 'Android' ? 'Google Inc. (ARM)' : 'Intel Open Source Technology Center',
-                unmaskedRenderer: renderer,
-                noiseSeed: (seedInt * 13) % 1000000 // Deterministic noise seed
+                vendor: gpu.vendorString,
+                renderer: gpu.rendererString,
+                unmaskedVendor: gpu.vendorString,
+                unmaskedRenderer: gpu.rendererString,
+                noiseSeed: (seedInt * 13) % 1000000
             },
             media: {
-                videoInputs: t.isMobile ? 2 : 1, // Front and back camera typically
+                videoInputs: isMobile ? 2 : 1,
                 audioInputs: 1,
                 audioOutputs: 1,
                 deviceIds: [
