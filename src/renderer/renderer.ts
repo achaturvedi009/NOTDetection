@@ -26,13 +26,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         profiles.forEach((p: any) => {
             const li = document.createElement('li');
             li.className = 'profile-item';
-            li.innerHTML = `
-                <span>${p.name} <small>(${p.id.substring(0,8)})</small></span>
-                <div class="profile-actions">
-                    <button onclick="launchProfile('${p.id}')">Launch</button>
-                    <button onclick="deleteProfile('${p.id}')" style="background:#dc3545;">Delete</button>
-                </div>
+
+            // Defend against XSS by using textContent for user-provided data
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = `${p.name} (${p.id.substring(0,8)})`;
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'profile-actions';
+            actionsDiv.innerHTML = `
+                <button onclick="launchProfile('${p.id}')">Launch</button>
+                <button onclick="deleteProfile('${p.id}')" style="background:#dc3545;">Delete</button>
             `;
+
+            li.appendChild(nameSpan);
+            li.appendChild(actionsDiv);
             profilesList.appendChild(li);
         });
     }

@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/achaturvedi009/NOTDetection#readme",
   "dependencies": {
+    "puppeteer-core": "^24.38.0",
     "sqlite3": "^5.1.7",
     "uuid": "^11.1.0"
   },
