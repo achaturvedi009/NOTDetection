@@ -57,6 +57,12 @@ export class ProfileAutomationController {
             // Phase 8: Profile Lifecycle & Health updates on closure
             const profile = await this.profileManager.getProfile(profileId);
             if (profile) {
+                // Emit Telemetry: Session End
+                const analytics = (global as any).analyticsWarehouse;
+                if (analytics) {
+                    analytics.recordEvent(profile.id, 'SESSION_END', { durationMs: duration, endRiskScore: profile.health.riskScore });
+                }
+
                 ProfileLifecycleController.onSessionEnd(profile, duration);
                 ProfileHealthMonitoringEngine.evaluateRiskScore(profile);
                 ProfileRepairRegenerationEngine.attemptRepair(profile);

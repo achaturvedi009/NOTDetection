@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createProfile: (name: string, proxyConfig: any) => ipcRenderer.invoke('create-profile', name, proxyConfig),
     deleteProfile: (id: string) => ipcRenderer.invoke('delete-profile', id),
     launchProfile: (id: string) => ipcRenderer.invoke('launch-profile', id),
+    getAnalytics: () => ipcRenderer.invoke('get-analytics'),
 });

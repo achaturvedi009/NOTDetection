@@ -13,6 +13,9 @@ import { ProfileAutomationController } from './automation/controller';
 import { AutomationAPIGateway } from './api/automation';
 import { ControlNodeOrchestrator } from './distributed/control';
 import { WorkerNodeRuntime } from './distributed/worker';
+import { AnalyticsDataWarehouse } from './analytics/warehouse';
+import { FingerprintDistributionAnalyzer } from './analytics/analyzers/distribution';
+import { RiskPredictionEngine } from './analytics/predictor';
 import * as crypto from 'crypto';
 
 // Determine Paths
@@ -34,6 +37,9 @@ const resourceManager = new LocalResourceManager(profilesDataPath, browserLaunch
 const automationController = new ProfileAutomationController(profileManager, browserLauncher);
 const automationGateway = new AutomationAPIGateway(automationController, 5543);
 
+// Initialize Analytics Engines
+const analyticsWarehouse = new AnalyticsDataWarehouse(userDataPath);
+
 let mainWindow: BrowserWindow | null;
 
 // Node Execution Modes: 'local', 'control', or 'worker'
@@ -45,8 +51,20 @@ async function initCoreSystems() {
     const masterKey = KeyManager.resolveMasterKey(userDataPath);
     encryption.initialize(masterKey);
 
-    // 2. Initialize Database
+    // 2. Initialize Databases
     await storage.initialize();
+    await analyticsWarehouse.initialize();
+
+    // Wire up Analytics API layer
+    automationGateway.analytics = analyticsWarehouse;
+    automationGateway.distributionAnalyzer = new FingerprintDistributionAnalyzer(analyticsWarehouse, profileManager);
+    const proxyAnalyzer = new (require('./analytics/analyzers/proxy').ProxyPerformanceAnalyzer)(analyticsWarehouse);
+    const detectionAnalyzer = new (require('./analytics/analyzers/detection').DetectionIntelligenceAnalyzer)(analyticsWarehouse);
+    automationGateway.proxyAnalyzer = proxyAnalyzer;
+    automationGateway.detectionAnalyzer = detectionAnalyzer;
+
+    // Bind the global analytics warehouse so that all local sessions/commands can pipe events immediately
+    (global as any).analyticsWarehouse = analyticsWarehouse;
 
     if (NODE_MODE === 'local') {
         console.log('[Boot Sequence] Local Enterprise Deployment Mode initialized. All cloud integrations are strictly disabled.');
@@ -74,7 +92,13 @@ async function initCoreSystems() {
         console.log('[Boot Sequence] Initializing as Local Enterprise Node.');
     }
 
-    // 5. Hydrate Device Profile Registry
+    // 5. Run Proactive Analytics Risk Prediction
+    if (NODE_MODE !== 'worker') {
+        const riskPredictor = new RiskPredictionEngine(analyticsWarehouse, profileManager);
+        await riskPredictor.predictSystemRisks();
+    }
+
+    // 6. Hydrate Device Profile Registry
     if (NODE_MODE !== 'worker') {
         const profiles = await storage.getAllProfiles();
         for (const pMeta of profiles) {
@@ -126,6 +150,21 @@ ipcMain.handle('create-profile', async (event, name: string, proxyConfig: any) =
 
 ipcMain.handle('delete-profile', async (event, id: string) => {
     await profileManager.deleteProfile(id);
+});
+
+ipcMain.handle('get-analytics', async () => {
+    // In a real local frontend, we can query the internal modules directly.
+    const osDistribution = await automationGateway.distributionAnalyzer?.getOSDistribution();
+    const threatLandscape = await automationGateway.detectionAnalyzer?.analyzeThreatLandscape();
+    const defaultProxyHealth = await automationGateway.proxyAnalyzer?.analyzeProxyHealth('example-proxy.com');
+    const recentDetections = await automationGateway.analytics?.queryEvents('DETECTION_SIGNAL', undefined, 10);
+
+    return {
+        osDistribution,
+        threatLandscape,
+        proxyHealth: defaultProxyHealth,
+        recentDetections
+    };
 });
 
 ipcMain.handle('launch-profile', async (event, id: string) => {

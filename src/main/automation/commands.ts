@@ -6,9 +6,18 @@ import { HumanInteractionController } from '../behavioral/controller';
  */
 export class InteractionCommandEngine {
     private behavior: HumanInteractionController;
+    private profileId: string;
 
-    constructor(behavior: HumanInteractionController) {
+    constructor(behavior: HumanInteractionController, profileId: string) {
         this.behavior = behavior;
+        this.profileId = profileId;
+    }
+
+    private emitTelemetry(action: string, target?: string) {
+        const analytics = (global as any).analyticsWarehouse;
+        if (analytics) {
+            analytics.recordEvent(this.profileId, 'BEHAVIORAL_INTERACTION', { action, target });
+        }
     }
 
     public async navigate(url: string): Promise<void> {
@@ -19,6 +28,7 @@ export class InteractionCommandEngine {
     }
 
     public async clickElement(selector: string): Promise<void> {
+        this.emitTelemetry('click', selector);
         // Wait for element to be visible
         const element = await this.behavior.page.waitForSelector(selector, { visible: true });
         if (!element) throw new Error(`Element ${selector} not found.`);
@@ -42,12 +52,14 @@ export class InteractionCommandEngine {
     }
 
     public async typeText(selector: string, text: string): Promise<void> {
+        this.emitTelemetry('type', selector);
         await this.clickElement(selector); // Focus the field humanly
         await this.behavior.keyboard.typeText(text); // Type with cadence/typos
         await this.behavior.session.determineIdleState();
     }
 
     public async scrollPage(distance: number): Promise<void> {
+        this.emitTelemetry('scroll');
         await this.behavior.scroll.scrollBy(distance);
         await this.behavior.session.determineIdleState();
     }

@@ -7,6 +7,7 @@ declare global {
             createProfile: (name: string, proxyConfig: any) => Promise<any>;
             deleteProfile: (id: string) => Promise<void>;
             launchProfile: (id: string) => Promise<void>;
+            getAnalytics: () => Promise<any>;
         };
     }
 }
@@ -80,5 +81,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadProfiles();
     };
 
+    async function loadAnalytics() {
+        const analyticsContent = document.getElementById('analyticsContent')!;
+        try {
+            const data = await window.electronAPI.getAnalytics();
+            analyticsContent.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+            analyticsContent.textContent = 'Failed to load analytics: ' + e;
+        }
+    }
+
     await loadProfiles();
+    await loadAnalytics();
+
+    // Refresh analytics periodically
+    setInterval(loadAnalytics, 15000);
 });

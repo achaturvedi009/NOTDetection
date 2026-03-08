@@ -17,12 +17,18 @@ export class BrowserSessionController {
 
     constructor(behaviorController: HumanInteractionController, profile: Profile) {
         this.behavior = behaviorController;
-        this.commands = new InteractionCommandEngine(behaviorController);
+        this.commands = new InteractionCommandEngine(behaviorController, profile.id);
         this.sessionStartMs = Date.now();
         this.profile = profile;
 
         // Initialize active detection monitoring
         this.detectionMonitor = new DetectionSignalMonitor(this.behavior.page, this.profile);
+
+        // Emit Telemetry: Session Start
+        const analytics = (global as any).analyticsWarehouse;
+        if (analytics) {
+            analytics.recordEvent(this.profile.id, 'SESSION_START', { os: this.profile.fingerprint.hardware.os, browser: this.profile.fingerprint.hardware.browser });
+        }
     }
 
     public getSessionDurationMs(): number {

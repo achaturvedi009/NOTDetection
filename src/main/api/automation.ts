@@ -3,6 +3,11 @@ import * as http from 'http';
 import { WebSocketServer } from 'ws';
 import * as crypto from 'crypto';
 import { ProfileAutomationController } from '../automation/controller';
+import { AnalyticsDataWarehouse } from '../analytics/warehouse';
+import { FingerprintDistributionAnalyzer } from '../analytics/analyzers/distribution';
+import { ProxyPerformanceAnalyzer } from '../analytics/analyzers/proxy';
+import { DetectionIntelligenceAnalyzer } from '../analytics/analyzers/detection';
+import { ProfilePerformanceAnalyzer } from '../analytics/analyzers/performance';
 
 /**
  * Enterprise Automation API Gateway
@@ -16,6 +21,11 @@ export class AutomationAPIGateway {
     private wss: WebSocketServer;
     private controller: ProfileAutomationController;
     private apiToken: string;
+    public analytics?: AnalyticsDataWarehouse;
+    public distributionAnalyzer?: FingerprintDistributionAnalyzer;
+    public proxyAnalyzer?: ProxyPerformanceAnalyzer;
+    public detectionAnalyzer?: DetectionIntelligenceAnalyzer;
+    public performanceAnalyzer?: ProfilePerformanceAnalyzer;
 
     constructor(controller: ProfileAutomationController, port: number = 5543) {
         this.port = port;
@@ -77,6 +87,36 @@ export class AutomationAPIGateway {
                 const { taskName, params } = req.body;
                 const result = await this.controller.executeTask(req.params.id as string, taskName, params);
                 res.status(200).json({ status: 'success', result });
+            } catch (error: unknown) {
+                const msg = error instanceof Error ? error.message : String(error);
+                res.status(500).json({ error: msg });
+            }
+        });
+
+        // Phase 11: Analytics Dashboard API
+        this.app.get('/api/v1/analytics/dashboard', async (req: Request, res: Response) => {
+            try {
+                if (!this.analytics || !this.distributionAnalyzer || !this.proxyAnalyzer || !this.detectionAnalyzer) {
+                    res.status(503).json({ error: 'Analytics engine not initialized.' });
+                    return;
+                }
+
+                const osDistribution = await this.distributionAnalyzer.getOSDistribution();
+                const recentDetections = await this.analytics.queryEvents('DETECTION_SIGNAL', undefined, 10);
+                const threatLandscape = await this.detectionAnalyzer.analyzeThreatLandscape();
+
+                // Fetch some default proxy health (in a real system, you'd iterate active proxies)
+                const defaultProxyHealth = await this.proxyAnalyzer.analyzeProxyHealth('example-proxy.com');
+
+                res.status(200).json({
+                    status: 'success',
+                    data: {
+                        osDistribution,
+                        threatLandscape,
+                        proxyHealth: defaultProxyHealth,
+                        recentDetections
+                    }
+                });
             } catch (error: unknown) {
                 const msg = error instanceof Error ? error.message : String(error);
                 res.status(500).json({ error: msg });

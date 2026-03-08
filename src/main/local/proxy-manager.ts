@@ -22,17 +22,22 @@ export class LocalProxyManager {
             const pingProcess = spawn(cmd, args);
 
             pingProcess.on('close', (code) => {
+                const analytics = (global as any).analyticsWarehouse;
                 if (code !== 0) {
                     console.warn(`[LocalProxyManager] Proxy ${config.host} is unreachable via ICMP.`);
+                    if (analytics) analytics.recordEvent('system', 'PROXY_HEALTH', { host: config.host, status: 'failed' });
                     resolve(-1); // Unreachable or ping blocked
                 } else {
                     const latency = Date.now() - startTime;
+                    if (analytics) analytics.recordEvent('system', 'PROXY_HEALTH', { host: config.host, status: 'success', latency });
                     resolve(latency);
                 }
             });
 
             pingProcess.on('error', () => {
                 console.warn(`[LocalProxyManager] Failed to spawn ping process.`);
+                const analytics = (global as any).analyticsWarehouse;
+                if (analytics) analytics.recordEvent('system', 'PROXY_HEALTH', { host: config.host, status: 'failed' });
                 resolve(-1);
             });
         });

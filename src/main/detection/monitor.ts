@@ -71,5 +71,11 @@ export class DetectionSignalMonitor {
         if (this.profile.health.recentDetections.length > 50) {
             this.profile.health.recentDetections.shift();
         }
+
+        // Emit Telemetry: Detection Signal
+        const analytics = (global as any).analyticsWarehouse;
+        if (analytics) {
+            analytics.recordEvent(this.profile.id, 'DETECTION_SIGNAL', { type, url, severity });
+        }
     }
 }
