@@ -4,6 +4,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Profile } from '../profile/models';
 import { FingerprintInjector } from '../fingerprint/injector';
+import { NetworkIdentityEngine } from '../network/engine';
+import { NetworkIdentityTemplateRegistry } from '../network/templates';
+import { NetworkConfig } from '../network/models';
 
 export class BrowserLauncher {
     private activeBrowsers: Map<string, puppeteer.Browser> = new Map();
@@ -43,18 +46,36 @@ export class BrowserLauncher {
             `--accept-lang=${profile.fingerprint.language}`
         ];
 
-        // Assign proxy if configured and not 'direct'
+        // 1. Load device template (implicitly handled in Profile creation, fingerprint config already loaded)
+        // 2. Load fingerprint configuration (loaded)
+
+        // 3. Load network identity template
+        const networkIdentityTemplate = NetworkIdentityTemplateRegistry.getTemplate(
+            profile.fingerprint.hardware.os,
+            profile.fingerprint.hardware.browserVersion
+        );
+
+        // Map Profile Proxy to AdvancedProxyConfig
+        const advancedProxy = profile.proxy as any;
+
+        // Compile comprehensive Network Identity Configuration
+        const networkConfig: NetworkConfig = {
+            webrtc: { mode: 'proxy_routed' }, // Secure default
+            dns: { dohEnabled: true, dohProviderUrl: 'https://cloudflare-dns.com/dns-query', bypassHostResolver: true, isolatedCache: true },
+            proxy: advancedProxy,
+            identityTemplate: networkIdentityTemplate
+        };
+
+        // 4, 5, 6, 7, 8: Bind Proxy, configure TLS/HTTP2/WebRTC/DNS
+        const networkFlags = NetworkIdentityEngine.compileNetworkFlags(profile.id, networkConfig);
+        args.push(...networkFlags);
+
         let requiresAuth = false;
-        if (profile.proxy && profile.proxy.type !== 'direct') {
-            if (profile.proxy.host && profile.proxy.port) {
-                let proxyStr = `${profile.proxy.type}://${profile.proxy.host}:${profile.proxy.port}`;
-                args.push(`--proxy-server=${proxyStr}`);
-                if (profile.proxy.username && profile.proxy.password) {
-                    requiresAuth = true;
-                }
-            }
+        if (advancedProxy.username && advancedProxy.password) {
+            requiresAuth = true;
         }
 
+        // 9. Launch browser instance
         const browser = await puppeteer.launch({
             executablePath: executablePath,
             args: args,
