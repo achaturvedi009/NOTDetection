@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { StorageLayer } from '../storage/database';
 import { Profile, ProxyConfig, FingerprintConfig } from './models';
+import { FingerprintGenerator } from '../fingerprint/generator';
 
 export class ProfileManager {
     private storage: StorageLayer;
@@ -15,16 +16,8 @@ export class ProfileManager {
         // Default proxy if none provided
         const defaultProxy: ProxyConfig = proxy || { type: 'direct' };
 
-        // Default basic fingerprint if none provided
-        const defaultFingerprint: FingerprintConfig = fingerprint || {
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-            platform: 'Win32',
-            hardwareConcurrency: 8,
-            deviceMemory: 8,
-            language: 'en-US',
-            timezone: 'America/New_York',
-            screenResolution: { width: 1920, height: 1080 }
-        };
+        // Default advanced fingerprint using Phase 2 Generator if none provided
+        const defaultFingerprint: FingerprintConfig = fingerprint || FingerprintGenerator.generateRealisticFingerprint();
 
         const newProfile: Profile = {
             id,

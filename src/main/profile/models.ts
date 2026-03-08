@@ -6,18 +6,52 @@ export interface ProxyConfig {
     password?: string;
 }
 
+export interface ScreenConfig {
+    width: number;
+    height: number;
+    colorDepth: number;
+    pixelRatio: number;
+}
+
+export interface WebGLConfig {
+    vendor: string;
+    renderer: string;
+    unmaskedVendor: string;
+    unmaskedRenderer: string;
+    noiseSeed: number;
+}
+
+export interface HardwareConfig {
+    hardwareConcurrency: number;
+    deviceMemory: number;
+    platform: string;
+    os: string;
+    osVersion: string;
+    browser: string;
+    browserVersion: string;
+}
+
+export interface MediaDeviceConfig {
+    videoInputs: number;
+    audioInputs: number;
+    audioOutputs: number;
+    deviceIds: string[];
+}
+
 export interface FingerprintConfig {
     userAgent: string;
-    canvasNoiseSeed?: number;
-    webglVendor?: string;
-    webglRenderer?: string;
-    audioNoiseSeed?: number;
-    hardwareConcurrency?: number;
-    deviceMemory?: number;
-    platform?: string;
-    timezone?: string;
-    language?: string;
-    screenResolution?: { width: number, height: number };
+    language: string;
+    languages: string[];
+    timezone: string;
+    timezoneOffset: number;
+    doNotTrack: boolean;
+    hardware: HardwareConfig;
+    screen: ScreenConfig;
+    webgl: WebGLConfig;
+    media: MediaDeviceConfig;
+    canvasNoiseSeed: number;
+    audioNoiseSeed: number;
+    fontMaskSeed: number;
 }
 
 export interface Profile {

@@ -20,6 +20,15 @@ export class BrowserLauncher {
         }
 
         const userDataDir = path.join(this.profilesDir, profile.id);
+        if (!fs.existsSync(userDataDir)) {
+            fs.mkdirSync(userDataDir, { recursive: true });
+        }
+
+        // Securely pass the fingerprint configuration to the custom Chromium fork.
+        // The custom fork is engineered to read `fingerprint.json` from the user-data-dir on startup
+        // and inject it straight into Blink/V8 engines before pages load.
+        const fpFile = path.join(userDataDir, 'fingerprint.json');
+        fs.writeFileSync(fpFile, JSON.stringify(profile.fingerprint));
 
         const args: string[] = [
             `--user-data-dir=${userDataDir}`,
@@ -27,8 +36,9 @@ export class BrowserLauncher {
             '--no-default-browser-check',
             '--disable-sync',
             '--disable-background-networking',
-            // Fingerprint arguments map (Simulated setup)
-            `--user-agent=${profile.fingerprint.userAgent}`
+            // Basic fingerprint arguments that can be passed natively
+            `--user-agent=${profile.fingerprint.userAgent}`,
+            `--accept-lang=${profile.fingerprint.language}`
         ];
 
         // Assign proxy if configured and not 'direct'
