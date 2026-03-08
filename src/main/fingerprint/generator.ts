@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { FingerprintConfig } from '../profile/models';
 import { DEVICE_TEMPLATES, DeviceTemplate } from './template';
 import { ConsistencyValidator } from './validator';
+import { BehavioralTemplates } from '../behavioral/templates';
 
 export class FingerprintGenerator {
 
@@ -47,6 +48,8 @@ export class FingerprintGenerator {
         const screen = pick(t.screenResolutions, 3);
         const renderer = pick(t.webglRendererList, 4);
 
+        const behavioral = BehavioralTemplates.getDeterministicBehavior(seedInt);
+
         return {
             userAgent: userAgent,
             language: 'en-US',
@@ -89,6 +92,7 @@ export class FingerprintGenerator {
                     this.deterministicHash(seedInt + 3)
                 ]
             },
+            behavioral: behavioral,
             canvasNoiseSeed: (seedInt * 17) % 1000000,
             audioNoiseSeed: (seedInt * 19) % 1000000,
             fontMaskSeed: (seedInt * 23) % 1000000

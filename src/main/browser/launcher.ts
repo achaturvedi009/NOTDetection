@@ -7,6 +7,7 @@ import { FingerprintInjector } from '../fingerprint/injector';
 import { NetworkIdentityEngine } from '../network/engine';
 import { NetworkIdentityTemplateRegistry } from '../network/templates';
 import { NetworkConfig } from '../network/models';
+import { HumanInteractionController } from '../behavioral/controller';
 
 export class BrowserLauncher {
     private activeBrowsers: Map<string, puppeteer.Browser> = new Map();
@@ -19,7 +20,7 @@ export class BrowserLauncher {
         }
     }
 
-    public async launchProfile(profile: Profile, executablePath: string): Promise<void> {
+    public async launchProfile(profile: Profile, executablePath: string): Promise<HumanInteractionController> {
         if (this.activeBrowsers.has(profile.id)) {
             throw new Error(`Profile ${profile.id} is already running.`);
         }
@@ -117,10 +118,18 @@ export class BrowserLauncher {
         // Optional: Navigate to a leak testing page to verify fingerprint upon launch
         await page.goto('https://abouthero.com'); // Example test page
 
+        // 10. Instantiate and attach the Behavioral Engine Controller to this session
+        const behaviorController = new HumanInteractionController(page as any, profile.fingerprint.behavioral);
+
+        // Record initial navigation
+        behaviorController.navigation.recordNavigation('https://abouthero.com');
+
         browser.on('disconnected', () => {
             this.activeBrowsers.delete(profile.id);
             console.log(`Browser for profile ${profile.id} closed.`);
         });
+
+        return behaviorController;
     }
 
     public async stopProfile(id: string): Promise<void> {

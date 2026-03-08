@@ -49,6 +49,18 @@ export interface SensorConfig {
     hasProximity: boolean;
 }
 
+export interface BehavioralConfig {
+    archetype: 'casual' | 'researcher' | 'fast' | 'mobile';
+    typingSpeedBaseMs: number;
+    typingVarianceMs: number;
+    scrollInertiaMultiplier: number;
+    mouseJitterStrength: number;
+    mouseCurveDeviation: number; // For Bezier curve control points
+    idleProbability: number;
+    maxIdleDurationMs: number;
+    sessionDurationTargetMs: number;
+}
+
 export interface FingerprintConfig {
     userAgent: string;
     language: string;
@@ -61,6 +73,7 @@ export interface FingerprintConfig {
     webgl: WebGLConfig;
     media: MediaDeviceConfig;
     sensors?: SensorConfig;
+    behavioral: BehavioralConfig;
     canvasNoiseSeed: number;
     audioNoiseSeed: number;
     fontMaskSeed: number;
