@@ -8,10 +8,16 @@ import { InteractionCommandEngine } from './commands';
 export class BrowserSessionController {
     public behavior: HumanInteractionController;
     public commands: InteractionCommandEngine;
+    public readonly sessionStartMs: number;
 
     constructor(behaviorController: HumanInteractionController) {
         this.behavior = behaviorController;
         this.commands = new InteractionCommandEngine(behaviorController);
+        this.sessionStartMs = Date.now();
+    }
+
+    public getSessionDurationMs(): number {
+        return Date.now() - this.sessionStartMs;
     }
 
     /**

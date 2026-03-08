@@ -51,7 +51,21 @@ export class ProfileManager {
             name,
             createdAt: new Date(),
             proxy: defaultProxy,
-            fingerprint: defaultFingerprint!
+            fingerprint: defaultFingerprint!,
+            lifecycleState: 'new',
+            health: {
+                riskScore: 0.0,
+                sessionCount: 0,
+                anomalyCount: 0,
+                lastHealthCheck: new Date(),
+                flags: []
+            },
+            usage: {
+                historyCount: 0,
+                cookieCount: 0,
+                cacheSizeBytes: 0,
+                totalSessionTimeMs: 0
+            }
         };
 
         await this.storage.insertProfile(id, name, newProfile);
@@ -65,6 +79,10 @@ export class ProfileManager {
             created.push(profile);
         }
         return created;
+    }
+
+    public async updateProfile(profile: Profile): Promise<void> {
+        await this.storage.insertProfile(profile.id, profile.name, profile); // Overwrite in SQLite
     }
 
     public async getProfile(id: string): Promise<Profile | null> {

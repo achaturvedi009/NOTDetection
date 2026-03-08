@@ -108,10 +108,32 @@ export interface FingerprintConfig {
     fontMaskSeed: number;
 }
 
+export type ProfileLifecycleState = 'new' | 'warming' | 'active' | 'mature' | 'aging' | 'retired';
+
+export interface ProfileHealth {
+    riskScore: number;          // 0.0 (safe) to 1.0 (highly risky)
+    sessionCount: number;
+    anomalyCount: number;
+    lastHealthCheck: Date;
+    flags: string[];
+}
+
+export interface ProfileUsageMetrics {
+    historyCount: number;
+    cookieCount: number;
+    cacheSizeBytes: number;
+    totalSessionTimeMs: number;
+}
+
 export interface Profile {
     id: string;
     name: string;
     createdAt: Date;
     proxy: ProxyConfig;
     fingerprint: FingerprintConfig;
+
+    // Phase 8 Additions
+    lifecycleState: ProfileLifecycleState;
+    health: ProfileHealth;
+    usage: ProfileUsageMetrics;
 }
