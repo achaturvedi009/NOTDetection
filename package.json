@@ -8,7 +8,28 @@
     "build:renderer": "npx esbuild src/renderer/renderer.ts --bundle --outfile=dist/renderer/renderer.bundle.js",
     "build": "npm run build:main && npm run build:renderer && mkdir -p dist/renderer && cp src/renderer/index.html dist/renderer/index.html",
     "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "com.enterprise.antidetect",
+    "productName": "Enterprise Stealth Browser",
+    "directories": {
+      "output": "release/"
+    },
+    "win": {
+      "target": "portable"
+    },
+    "mac": {
+      "target": "dmg",
+      "hardenedRuntime": true
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "repository": {
     "type": "git",
@@ -35,6 +56,7 @@
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "electron": "^40.8.0",
+    "electron-builder": "^26.8.1",
     "esbuild": "^0.27.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
